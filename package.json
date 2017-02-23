@@ -1,0 +1,19 @@
+{
+  "name": "hashcode-2017-practice",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": {},
+  "author": "arturparkhisenko",
+  "contributors": [
+    "arturparkhisenko",
+    "dmytraw"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "eslint": "^3.16.1"
+  }
+}
