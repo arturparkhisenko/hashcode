@@ -1,9 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 
-let files = ['example.in'];
+let files = ['data-examples/example.in'];
 
-const full = true;
+const full = false;
 
 if (full) {
   files.push(
@@ -26,11 +26,11 @@ if (full) {
 // s3 endpoint {latency, cacheServersNum}
 // s4 videoStats {requests, id, endpointId}
 
-for (fileName of files) {
+for (const fileName of files) {
   processFile(fileName);
 }
 
-function processFile() {
+function processFile(fileName) {
   fs.readFile(path.resolve(__dirname, fileName), 'utf8',
     /**
      * fs callback
