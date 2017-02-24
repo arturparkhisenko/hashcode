@@ -1,11 +1,18 @@
 const fs = require('fs');
 const path = require('path');
 
-// const fileName = 'example.in';
-// const fileName = 'data-examples/kittens.in';
-const fileName = 'data-examples/me_at_the_zoo.in';
-// const fileName = 'data-examples/trending_today.in';
-// const fileName = 'data-examples/videos_worth_spreading.in';
+let files = ['example.in'];
+
+const full = true;
+
+if (full) {
+  files.push(
+    'data-examples/kittens.in',
+    'data-examples/me_at_the_zoo.in',
+    'data-examples/trending_today.in',
+    'data-examples/videos_worth_spreading.in'
+  )
+}
 
 // V E R C X (example: 10000 1000 200000 500 6000)
 //
@@ -14,88 +21,92 @@ const fileName = 'data-examples/me_at_the_zoo.in';
 // R - request descriptions
 // C - cache servers
 // X - capacity in mb of each server
-// 
+//
 // s2 videos sizes
 // s3 endpoint {latency, cacheServersNum}
 // s4 videoStats {requests, id, endpointId}
 
-fs.readFile(path.resolve(__dirname, fileName), 'utf8',
-  /**
-   * fs callback
-   * @param  {Object} err
-   * @param  {String} data
-   */
-  function(err, data) {
-    if (err) {
-      return console.log(err);
-    }
-    let dataArray = data.split('\n');
-    if (dataArray[dataArray.length - 1] === '') {
-      dataArray.pop(); // trim trailing whitespace
-    }
-    // console.log(dataArray);
-    const firstLine = dataArray[0].split(' ');
-    const V = parseInt(firstLine[0]);
-    const E = parseInt(firstLine[1]);
-    const R = parseInt(firstLine[2]);
-    const C = parseInt(firstLine[3]);
-    const X = parseInt(firstLine[4]);
-    console.log({
-      // V,
-      // E,
-      // R,
-      // C,
-      X
-    });
+for (fileName of files) {
+  processFile(fileName);
+}
 
-    const videoSizes = dataArray[1].split(' ');
-    // console.log(videoStats); 
-
-    dataArray.shift();
-    dataArray.shift(); // to get data only
-    // console.log(dataArray);
-
-    const splittedData = dataSplitter(dataArray);
-
-    // sort videos by requests
-    let videos = splittedData.videoStats.sort(function(a, b) {
-      // console.log(a,b);
-      return b.requests - a.requests;
-    });
-    // console.log('videos sorted');
-    // console.log(videos);
-
-    // delete video with size bigger than X capacity
-    videos = videos.filter(el => videoSizes[el.videoId] < X);
-    // console.log('videos filtered');
-    // console.log(videos);
-
-    const servers = getCacheServersDistribution(V, E, R, C, X, videoSizes, splittedData, videos);
-    const cacheServersNum = servers.length;
-
-    let results = `${cacheServersNum}\n`;
-
-    // console.log(servers);
-
-    for (var i = 0; i < servers.length; i++) {
-      results += `${servers[i].id}`;
-
-      for (var j = 0; j < servers[i].videoIds.length; j++) {
-        results += ` ${servers[i].videoIds[j]}`;
+function processFile() {
+  fs.readFile(path.resolve(__dirname, fileName), 'utf8',
+    /**
+     * fs callback
+     * @param  {Object} err
+     * @param  {String} data
+     */
+    function(err, data) {
+      if (err) {
+        return console.log(err);
       }
-      results += `\n`;
+      let dataArray = data.split('\n');
+      if (dataArray[dataArray.length - 1] === '') {
+        dataArray.pop(); // trim trailing whitespace
+      }
+      // console.log(dataArray);
+      const firstLine = dataArray[0].split(' ');
+      const V = parseInt(firstLine[0]);
+      const E = parseInt(firstLine[1]);
+      const R = parseInt(firstLine[2]);
+      const C = parseInt(firstLine[3]);
+      const X = parseInt(firstLine[4]);
+      // console.log({
+      //   V,
+      //   E,
+      //   R,
+      //   C,
+      //   X
+      // });
 
+      const videoSizes = dataArray[1].split(' ');
+      // console.log(videoStats);
+
+      dataArray.shift();
+      dataArray.shift(); // to get data only
+      // console.log(dataArray);
+
+      const splittedData = dataSplitter(dataArray);
+
+      // sort videos by requests
+      let videos = splittedData.videoStats.sort(
+        (a, b) => b.requests - a.requests
+      );
+      // console.log('videos sorted');
+      // console.log(videos);
+
+      // delete video with size bigger than X capacity
+      videos = videos.filter(el => videoSizes[el.videoId] < X);
+      // console.log('videos filtered');
+      // console.log(videos);
+
+      const servers = getCacheServersDistribution(V, E, R, C, X,
+        videoSizes, splittedData, videos);
+      const cacheServersNum = servers.length;
+
+      let results = `${cacheServersNum}\n`;
+
+      // console.log(servers);
+
+      for (var i = 0; i < servers.length; i++) {
+        results += `${servers[i].id}`;
+        for (var j = 0; j < servers[i].videoIds.length; j++) {
+          results += ` ${servers[i].videoIds[j]}`;
+        }
+        results += `\n`;
+      }
+
+      // example: output to file
+      // 3 - how much cache servers
+      // serverId videoId videoId
+      // 0        2       3
+
+      console.log(results);
+      writeResults(results, fileName);
     }
-
-    // example: output to file
-    // 3 - how much cache servers
-    // serverId videoId videoId
-    // 0        2       3
-
-    console.log(results);
-    writeResults(results, fileName);
-  }
-);
+  );
+}
 
 const dataSplitter = (inputData = []) => {
   let result = {
@@ -194,10 +205,10 @@ const getCacheServersDistribution = (V, E, R, C, X, videoSizes, splittedData, vi
   sortedCacheServers.sort((a, b) => a.latency - b.latency);
   // console.log(sortedCacheServers);
 
-  let bannedIds = [];
+  let usedIds = [];
   for (var i = 0; i < sortedCacheServers.length; i++) {
     // videos
-    // videoSizes[videos[i].videoId] 
+    // videoSizes[videos[i].videoId]
     let serverRemainingCapacity = X;
     for (let j = 0; j < videos.length; j++) {
       // console.log('serverRemainingCapacity');
@@ -206,11 +217,11 @@ const getCacheServersDistribution = (V, E, R, C, X, videoSizes, splittedData, vi
       const videoSize = parseInt(videoSizes[videos[j].videoId]);
       const videoObj = videos[j];
       if (videoSize <= serverRemainingCapacity &&
-        bannedIds.indexOf(videoObj.videoId) < 0 &&
-        videoObj.endpointId === sortedCacheServers[i].endpointId
+        usedIds.indexOf(videoObj.videoId) < 0
+        // && videoObj.endpointId === sortedCacheServers[i].endpointId
       ) {
         serverRemainingCapacity -= videoSize;
-        bannedIds.push(videoObj.videoId);
+        usedIds.push(videoObj.videoId);
         sortedCacheServers[i].videoIds.push(videoObj.videoId);
       }
     }
