@@ -1,19 +1,15 @@
 const fs = require('fs');
 const path = require('path');
 
-// let files = ['data-examples/example.in'];
-let files = ['data-examples/me_at_the_zoo.in'];
+const test = false;
 
-const full = false;
-
-if (full) {
-  files.push(
-    'data-examples/kittens.in',
-    'data-examples/me_at_the_zoo.in',
-    'data-examples/trending_today.in',
-    'data-examples/videos_worth_spreading.in'
-  )
-}
+// let files = test ? ['data-examples/example.in'] : [
+let files = test ? ['data-examples/me_at_the_zoo.in'] : [
+  'data-examples/kittens.in',
+  'data-examples/me_at_the_zoo.in',
+  'data-examples/trending_today.in',
+  'data-examples/videos_worth_spreading.in'
+];
 
 // V E R C X (example: 10000 1000 200000 500 6000)
 //
@@ -219,6 +215,9 @@ const getCacheServersDistribution = (V, E, R, C, X,
   let usedIds = [];
   for (let i = 0; i < sortedCacheServers.length; i++) {
     let serverRemainingCapacity = X;
+    // console.log('sortedCacheServers[i]', sortedCacheServers[i]);
+
+    //loop through videos to check if one of them have to be added
     for (let j = 0; j < videos.length; j++) {
       // console.log('serverRemainingCapacity');
       // console.log(serverRemainingCapacity);
@@ -226,8 +225,11 @@ const getCacheServersDistribution = (V, E, R, C, X,
       const videoSize = parseInt(videoSizes[videos[j].videoId]);
       const videoObj = videos[j];
 
-      //fill by minimal latency
-      //TODO
+      //fill by minimal latency only, requires second step
+      // console.log('videos[j]', videos[j]); // with endpointId
+      if (videoObj.endpointId !== sortedCacheServers[i].endpoints[0].endpointId) {
+        continue;
+      }
 
       if (
         checkCapacity(videoSize, serverRemainingCapacity) &&
@@ -241,7 +243,7 @@ const getCacheServersDistribution = (V, E, R, C, X,
     }
   }
 
-  //fill servers, second step (sharding)
+  //fill servers, second step (sharding), check if video was already added!
   //TODO
   //let videoIds = Object.assign([], );
 
