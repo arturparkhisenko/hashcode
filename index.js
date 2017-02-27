@@ -181,7 +181,7 @@ const getLatencies = (data, index, num) => {
 };
 
 const checkCapacity = (videoSize, serverRemainingCapacity) => videoSize <= serverRemainingCapacity;
-const checkIfVideoIsUsed = (videoIds, videoId) => videoIds.indexOf(videoId) < 0;
+const checkIfVideoIsIn = (arrayOfVideos, videoId) => arrayOfVideos.indexOf(videoId) < 0;
 
 const checkIfEndpointFound = (endpoints, videoId) => {
   let result = false;
@@ -208,7 +208,7 @@ const sharding = (cacheServersIn, videos) => {
       if (
         checkIfEndpointFound(cacheServer.endpoints, videoObj.endpointId) &&
         checkCapacity(videoObj.size, cacheServer.remainingCapacity) &&
-        checkIfVideoIsUsed(cacheServer.videoIds, videoObj.videoId)
+        checkIfVideoIsIn(cacheServer.videoIds, videoObj.videoId)
       ) {
         cacheServer.remainingCapacity -= videoObj.size;
         cacheServer.videoIds.push(videoObj.videoId);
@@ -254,6 +254,10 @@ const findPriorityVideosLength = (endpoint, videos) => {
   return videosLength;
 };
 
+const getVideosForEndpoint = (videos, endpointId) => {
+  return videos.filter(value => value.endpointId === endpointId);
+};
+
 const getCacheServersDistribution = (V, E, R, C, X,
   videoSizes, splittedData, videos) => {
   // add latency to server
@@ -274,7 +278,8 @@ const getCacheServersDistribution = (V, E, R, C, X,
       // endpoints
       tempServers[latencies[i].cacheServerId].endpoints.push({
         endpointId: j,
-        latency: latencies[i].latencyToTheCacheServer
+        latency: latencies[i].latencyToTheCacheServer,
+        videos: getVideosForEndpoint(videos, j)
       });
     }
     for (let i = 0; i < latencies.length; i++) {
@@ -327,9 +332,9 @@ const getCacheServersDistribution = (V, E, R, C, X,
       // console.log('sortedCacheServers[i]', cacheServer);
 
       //loop through videos to check if one of them have to be added
-      for (let j = 0; j < videos.length; j++) {
+      for (let j = 0; j < endpoint.videos.length; j++) {
         // console.log('serverRemainingCapacity', serverRemainingCapacity);
-        const videoObj = videos[j];
+        const videoObj = endpoint.videos[j];
 
         //when to start sharding
         if (priorityVideosLength === 0) {
@@ -345,7 +350,7 @@ const getCacheServersDistribution = (V, E, R, C, X,
         //only one video with best latency
         if (
           checkCapacity(videoObj.size, cacheServer.remainingCapacity) &&
-          checkIfVideoIsUsed(cacheServer.videoIds, videoObj.videoId)
+          checkIfVideoIsIn(cacheServer.videoIds, videoObj.videoId)
         ) {
           cacheServer.remainingCapacity -= videoObj.size;
           cacheServer.videoIds.push(videoObj.videoId);
