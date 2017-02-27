@@ -4,9 +4,9 @@ const path = require('path');
 const test = false;
 
 let files = test ? ['data-examples/example.in'] : [
-  // 'data-examples/kittens.in',
+  'data-examples/kittens.in',
   // 'data-examples/me_at_the_zoo.in',
-  'data-examples/trending_today.in',
+  // 'data-examples/trending_today.in',
   // 'data-examples/videos_worth_spreading.in'
 ];
 
@@ -23,6 +23,7 @@ let files = test ? ['data-examples/example.in'] : [
 // s4 videoStats {requests, id, endpointId}
 
 for (const fileName of files) {
+  console.log(`Reading file: ${fileName}!`);
   processFile(fileName);
 }
 
@@ -37,6 +38,9 @@ function processFile(fileName) {
       if (err) {
         return console.log(err);
       }
+
+      console.log(`File opened: ${fileName}!`);
+
       let dataArray = data.split('\n');
       if (dataArray[dataArray.length - 1] === '') {
         dataArray.pop(); // trim trailing whitespace
@@ -57,13 +61,15 @@ function processFile(fileName) {
       // });
 
       const videoSizes = dataArray[1].split(' ');
-      // console.log(videoStats);
+      console.log('VideoSizes received!');
+      // console.log(videoSizes);
 
       dataArray.shift();
       dataArray.shift(); // to get data only
       // console.log(dataArray);
 
       const splittedData = dataSplitter(dataArray);
+      console.log('Data splitted!');
 
       // sort videos by requests
       let videos = splittedData.videoStats.sort(
@@ -76,7 +82,7 @@ function processFile(fileName) {
       });
       // delete video with size bigger than X capacity
       videos = videos.filter(el => videoSizes[el.videoId] < X);
-      // console.log('videos sorted and filtered');
+      console.log('Videos sorted and filtered');
       // console.log(videos);
 
       const servers = getCacheServersDistribution(V, E, R, C, X,
@@ -278,6 +284,8 @@ const getCacheServersDistribution = (V, E, R, C, X,
 
   // console.log(tempServers);
 
+  console.log('Servers gathered with data!');
+
   // sort by min mid latency
   let sortedCacheServers = [];
   for (let server in tempServers) {
@@ -301,8 +309,12 @@ const getCacheServersDistribution = (V, E, R, C, X,
   }
   // console.log(sortedCacheServers);
 
+  console.log(`Servers (${sortedCacheServers.length}) sorted and filled with endpoints`);
+
   //fill em, first step (initial)
   for (let i = 0; i < sortedCacheServers.length; i++) {
+    console.log(`Working with server ${i}`);
+
     let cacheServer = sortedCacheServers[i];
 
     // let priorityEndpointsLength = 1;
@@ -345,6 +357,8 @@ const getCacheServersDistribution = (V, E, R, C, X,
 
   //fill servers, second step (sharding), check if video was already added!
   sortedCacheServers = sharding(sortedCacheServers, videos);
+
+  console.log('Servers sharded');
 
   // console.log(JSON.stringify(sortedCacheServers));
   // console.log(sortedCacheServers);
