@@ -106,6 +106,18 @@ function processFile(fileName) {
   );
 }
 
+const getVideoId = (videos, videoId, endpointId) => {
+  let result = -1;
+  for (let i = 0; i < videos.length; i++) {
+    if (videos[i].videoId === videoId &&
+      videos[i].endpointId === endpointId) {
+      result = i;
+      break;
+    }
+  }
+  return result;
+};
+
 const dataSplitter = (inputData = []) => {
   let result = {
     endpoints: [],
@@ -136,7 +148,12 @@ const dataSplitter = (inputData = []) => {
         endpointId: parseInt(line[1]),
         requests: parseInt(line[2])
       };
-      result.videoStats.push(video);
+      const existingVideoId = getVideoId(result.videoStats, video.videoId, video.endpointId);
+      if (existingVideoId >= 0) {
+        result.videoStats[existingVideoId].requests += video.requests;
+      } else {
+        result.videoStats.push(video);
+      }
     }
   }
 
@@ -158,7 +175,7 @@ const getLatencies = (data, index, num) => {
 };
 
 const checkCapacity = (videoSize, serverRemainingCapacity) => videoSize <= serverRemainingCapacity;
-const checkIfVideoIsUsed = (usedIds, videoId) => usedIds.indexOf(videoId) < 0;
+const checkIfVideoIsUsed = (videoIds, videoId) => videoIds.indexOf(videoId) < 0;
 
 const checkIfEndpointFound = (endpoints, videoId) => {
   let result = false;
@@ -185,7 +202,7 @@ const sharding = (cacheServersIn, videos) => {
       if (
         checkIfEndpointFound(cacheServer.endpoints, videoObj.endpointId) &&
         checkCapacity(videoObj.size, cacheServer.remainingCapacity) &&
-        cacheServer.videoIds.indexOf(videoObj.videoId) < 0
+        checkIfVideoIsUsed(cacheServer.videoIds, videoObj.videoId)
       ) {
         cacheServer.remainingCapacity -= videoObj.size;
         cacheServer.videoIds.push(videoObj.videoId);
@@ -193,6 +210,42 @@ const sharding = (cacheServersIn, videos) => {
     }
   }
   return sortedCacheServers;
+};
+
+const findPriorityEndpointsLength = () => {
+  let endpointsLength = 1;
+
+  return endpointsLength;
+};
+
+const findPriorityVideosLength = (endpoint, videos) => {
+  if (!videos || !videos.length) {
+    return 0;
+  }
+  let videosLength = 1;
+  let averageRequests = 0;
+  let averageRequestsLength = 0;
+
+  const filteredVideos = videos.filter(video => endpoint.endpointId === video.endpointId);
+
+  for (let i = 0; i < filteredVideos.length; i++) {
+    if (endpoint.endpointId === filteredVideos[i].endpointId) {
+      averageRequests += filteredVideos[i].requests;
+      averageRequestsLength++;
+    }
+  }
+  averageRequests /= averageRequestsLength;
+  // console.log({averageRequests, averageRequestsLength});
+
+  for (let i = 1; i < filteredVideos.length; i++) {
+    if (endpoint.endpointId === filteredVideos[i].endpointId &&
+      filteredVideos[i].requests <= averageRequests) {
+      videosLength = i;
+      break;
+    }
+  }
+
+  return videosLength;
 };
 
 const getCacheServersDistribution = (V, E, R, C, X,
@@ -249,32 +302,43 @@ const getCacheServersDistribution = (V, E, R, C, X,
   // console.log(sortedCacheServers);
 
   //fill em, first step (initial)
-  let usedIds = [];
   for (let i = 0; i < sortedCacheServers.length; i++) {
-    let serverObj = sortedCacheServers[i];
-    // console.log('sortedCacheServers[i]', serverObj);
+    let cacheServer = sortedCacheServers[i];
 
-    //loop through videos to check if one of them have to be added
-    for (let j = 0; j < videos.length; j++) {
-      // console.log('serverRemainingCapacity', serverRemainingCapacity);
-      const videoObj = videos[j];
+    // let priorityEndpointsLength = 1;
 
-      //fill by minimal latency only, requires second step
-      // console.log('videos[j]', videos[j]); // with endpointId
-      if (videoObj.endpointId !== serverObj.endpoints[0].endpointId) {
-        continue;
-      }
+    for (let k = 0; k < cacheServer.endpoints.length; k++) {
+      const endpoint = cacheServer.endpoints[k];
+      let priorityVideosLength = findPriorityVideosLength(endpoint, videos);
+      // console.log('priorityVideosLength', priorityVideosLength);
 
-      //only one video with best latency
-      if (
-        checkCapacity(videoObj.size, serverObj.remainingCapacity) &&
-        checkIfVideoIsUsed(usedIds, videoObj.videoId)
-      ) {
-        serverObj.remainingCapacity -= videoObj.size;
-        usedIds.push(videoObj.videoId);
-        serverObj.videoIds.push(videoObj.videoId);
-        // TODO use a found priority % when to start sharding
-        break;
+      // console.log('sortedCacheServers[i]', cacheServer);
+
+      //loop through videos to check if one of them have to be added
+      for (let j = 0; j < videos.length; j++) {
+        // console.log('serverRemainingCapacity', serverRemainingCapacity);
+        const videoObj = videos[j];
+
+        //when to start sharding
+        if (priorityVideosLength === 0) {
+          break;
+        }
+
+        //fill by minimal latency only, requires second step
+        // console.log('videos[j]', videos[j]); // with endpointId
+        if (videoObj.endpointId !== cacheServer.endpoints[0].endpointId) {
+          continue;
+        }
+
+        //only one video with best latency
+        if (
+          checkCapacity(videoObj.size, cacheServer.remainingCapacity) &&
+          checkIfVideoIsUsed(cacheServer.videoIds, videoObj.videoId)
+        ) {
+          cacheServer.remainingCapacity -= videoObj.size;
+          cacheServer.videoIds.push(videoObj.videoId);
+          priorityVideosLength--;
+        }
       }
     }
   }
