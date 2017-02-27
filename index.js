@@ -85,18 +85,18 @@ function processFile(fileName) {
       console.log('Videos sorted and filtered');
       // console.log(videos);
 
-      const servers = getCacheServersDistribution(V, E, R, C, X,
-        videoSizes, splittedData, videos);
-      const cacheServersNum = servers.length;
+      const servers = getServers(X, splittedData, videos);
+      const distribution = getCacheServersDistribution(servers, videos);
+      const cacheServersNum = distribution.length;
 
       let results = `${cacheServersNum}\n`;
 
-      // console.log(servers);
+      // console.log(distribution);
 
-      for (let i = 0; i < servers.length; i++) {
-        results += `${servers[i].id}`;
-        for (let j = 0; j < servers[i].videoIds.length; j++) {
-          results += ` ${servers[i].videoIds[j]}`;
+      for (let i = 0; i < distribution.length; i++) {
+        results += `${distribution[i].id}`;
+        for (let j = 0; j < distribution[i].videoIds.length; j++) {
+          results += ` ${distribution[i].videoIds[j]}`;
         }
         results += `\n`;
       }
@@ -258,8 +258,7 @@ const getVideosForEndpoint = (videos, endpointId) => {
   return videos.filter(value => value.endpointId === endpointId);
 };
 
-const getCacheServersDistribution = (V, E, R, C, X,
-  videoSizes, splittedData, videos) => {
+const getServers = (X, splittedData, videos) => {
   // add latency to server
   let tempServers = {};
   for (let j = 0; j < splittedData.endpoints.length; j++) {
@@ -315,6 +314,12 @@ const getCacheServersDistribution = (V, E, R, C, X,
   // console.log(sortedCacheServers);
 
   console.log(`Servers (${sortedCacheServers.length}) sorted and filled with endpoints`);
+
+  return sortedCacheServers;
+};
+
+const getCacheServersDistribution = (sortedCacheServersIn, videos) => {
+  let sortedCacheServers = Object.assign([], sortedCacheServersIn);
 
   // TODO fork 4 processes
   // https://nodejs.org/dist/latest-v7.x/docs/api/child_process.html#child_process_child_process_fork_modulepath_args_options
