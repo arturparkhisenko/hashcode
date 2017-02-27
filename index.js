@@ -4,8 +4,8 @@ const path = require('path');
 const test = false;
 
 let files = test ? ['data-examples/example.in'] : [
-  'data-examples/kittens.in',
-  // 'data-examples/me_at_the_zoo.in',
+  // 'data-examples/kittens.in',
+  'data-examples/me_at_the_zoo.in',
   // 'data-examples/trending_today.in',
   // 'data-examples/videos_worth_spreading.in'
 ];
@@ -316,12 +316,16 @@ const getCacheServersDistribution = (V, E, R, C, X,
 
   console.log(`Servers (${sortedCacheServers.length}) sorted and filled with endpoints`);
 
+  // TODO fork 4 processes
+  // https://nodejs.org/dist/latest-v7.x/docs/api/child_process.html#child_process_child_process_fork_modulepath_args_options
+
   //fill em, first step (initial)
   for (let i = 0; i < sortedCacheServers.length; i++) {
     console.log(`Working with server ${i}`);
 
     let cacheServer = sortedCacheServers[i];
 
+    // TODO
     // let priorityEndpointsLength = 1;
 
     for (let k = 0; k < cacheServer.endpoints.length; k++) {
