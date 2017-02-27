@@ -1,5 +1,7 @@
-const fs = require('fs');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
+const cp = require('child_process');
 
 const test = false;
 
@@ -21,6 +23,8 @@ let files = test ? ['data-examples/example.in'] : [
 // s2 videos sizes
 // s3 endpoint {latency, cacheServersNum}
 // s4 videoStats {requests, id, endpointId}
+
+console.log(`OS cores (${os.cpus().length})!`);
 
 for (const fileName of files) {
   console.log(`Reading file: ${fileName}!`);
@@ -47,10 +51,10 @@ function processFile(fileName) {
       }
       // console.log(dataArray);
       const firstLine = dataArray[0].split(' ');
-      const V = parseInt(firstLine[0]);
-      const E = parseInt(firstLine[1]);
-      const R = parseInt(firstLine[2]);
-      const C = parseInt(firstLine[3]);
+      // const V = parseInt(firstLine[0]);
+      // const E = parseInt(firstLine[1]);
+      // const R = parseInt(firstLine[2]);
+      // const C = parseInt(firstLine[3]);
       const X = parseInt(firstLine[4]);
       // console.log({
       //   V,
@@ -106,7 +110,7 @@ function processFile(fileName) {
       // serverId videoId videoId
       // 0        2       3
 
-      console.log(results);
+      console.log('\nDistribution results:\n', results);
       writeResults(results, fileName);
     }
   );
@@ -324,6 +328,20 @@ const getCacheServersDistribution = (sortedCacheServersIn, videos) => {
   // TODO fork 4 processes
   // https://nodejs.org/dist/latest-v7.x/docs/api/child_process.html#child_process_child_process_fork_modulepath_args_options
 
+  const childProcesses = [];
+  const cpusNum = os.cpus().length;
+  for (let i = 0; i < cpusNum; i++) {
+    childProcesses.push(cp.fork('./child-process-fork.js'));
+
+    // i
+  }
+  console.log(`Child Processes (${childProcesses.length}) was created!`);
+
+  // n.on('message', (m) => {
+  //   console.log('PARENT got message:', m);
+  // });
+  // n.send({ hello: 'world' });
+
   //fill em, first step (initial)
   for (let i = 0; i < sortedCacheServers.length; i++) {
     console.log(`Working with server ${i}`);
@@ -381,6 +399,11 @@ const getCacheServersDistribution = (sortedCacheServersIn, videos) => {
   sortedCacheServers = sortedCacheServers.filter(server => server.videoIds.length);
 
   // console.log(sortedCacheServers);
+
+  //kill all processes
+  for (let i = 0; i < childProcesses.length; i++) {
+    childProcesses[i].kill();
+  }
 
   return sortedCacheServers;
 };
