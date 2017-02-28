@@ -43,6 +43,8 @@ function processFile(fileName) {
         return console.log(err);
       }
 
+      const timeLabel = `Time-for-${fileName}`;
+      console.time(timeLabel);
       console.log(`File opened: ${fileName}!`);
 
       let dataArray = data.split('\n');
@@ -56,13 +58,7 @@ function processFile(fileName) {
       // const R = parseInt(firstLine[2]);
       // const C = parseInt(firstLine[3]);
       const X = parseInt(firstLine[4]);
-      // console.log({
-      //   V,
-      //   E,
-      //   R,
-      //   C,
-      //   X
-      // });
+      // console.log({V, E, R, C, X});
 
       const videoSizes = dataArray[1].split(' ');
       console.log('VideoSizes received!');
@@ -90,7 +86,9 @@ function processFile(fileName) {
       // console.log(videos);
 
       const servers = getServers(X, splittedData, videos);
+      console.log('Servers sorted / filtered / filled received!');
       const distribution = getCacheServersDistribution(servers, videos);
+      console.log('Distribution finished!');
       const cacheServersNum = distribution.length;
 
       let results = `${cacheServersNum}\n`;
@@ -110,11 +108,19 @@ function processFile(fileName) {
       // serverId videoId videoId
       // 0        2       3
 
+      console.timeEnd(timeLabel);
+
       console.log('\nDistribution results:\n', results);
       writeResults(results, fileName);
     }
   );
 }
+
+// const toFastProperties = (o) => {
+//   function f() {}
+//   f.prototype = o;
+//   return new f;
+// }
 
 const getVideoId = (videos, videoId, endpointId) => {
   let result = -1;
@@ -128,14 +134,12 @@ const getVideoId = (videos, videoId, endpointId) => {
   return result;
 };
 
-const dataSplitter = (inputData = []) => {
+const dataSplitter = (data = []) => {
   let result = {
     endpoints: [],
     videoStats: []
   };
-  let data = Object.assign([], inputData);
   let currentEndpointId = 0;
-
   for (let i = 0; i < data.length; i++) {
     const line = data[i].split(' ');
     if (line.length === 2) {
@@ -166,9 +170,7 @@ const dataSplitter = (inputData = []) => {
       }
     }
   }
-
   // console.log(result);
-
   return result;
 };
 
@@ -185,12 +187,13 @@ const getLatencies = (data, index, num) => {
 };
 
 const checkCapacity = (videoSize, serverRemainingCapacity) => videoSize <= serverRemainingCapacity;
+
 const checkIfVideoIsIn = (arrayOfVideos, videoId) => arrayOfVideos.indexOf(videoId) < 0;
 
 const checkIfEndpointFound = (endpoints, videoId) => {
   let result = false;
-  for (let i = 0; i < endpoints.length; i++) {
-    if (endpoints[i].endpointId === videoId) {
+  for (let endpoint of endpoints) {
+    if (endpoint.endpointId === videoId) {
       result = true;
       break;
     }
@@ -198,14 +201,12 @@ const checkIfEndpointFound = (endpoints, videoId) => {
   return result;
 };
 
-const sharding = (cacheServersIn, videos) => {
-  let cacheServers = Object.assign([], cacheServersIn);
+const sharding = (cacheServers, videos) => {
   //fill servers, second step (sharding), check if video was already added!
   let sortedCacheServers = Object.assign([], cacheServers);
   for (let i = 0; i < sortedCacheServers.length; i++) {
     let cacheServer = sortedCacheServers[i];
-    // console.log('cache serv: ', cacheServer);
-    // console.log('videos: ', videos);
+    // console.log({cacheServer, videos});
     for (let j = 0; j < videos.length; j++) {
       const videoObj = videos[j];
       // console.log('videosObj: ', videoObj); // with endpointId
@@ -222,13 +223,24 @@ const sharding = (cacheServersIn, videos) => {
   return sortedCacheServers;
 };
 
-const findPriorityEndpointsLength = () => {
-  let endpointsLength = 1;
-
-  return endpointsLength;
+const getPriorityEndpointsIds = (endpoints) => {
+  let IDs = [];
+  let averageLatency = 0;
+  for (let endpoint of endpoints) {
+    averageLatency += endpoint.latency;
+  }
+  averageLatency /= endpoints.length;
+  for (let endpoint of endpoints) {
+    if (endpoint.latency > averageLatency) {
+      break;
+    }
+    IDs.push(endpoint.endpointId);
+  }
+  // console.log({averageLatency, endpointsLength: endpoints.length, IDs});
+  return IDs;
 };
 
-const findPriorityVideosLength = (endpoint, videos) => {
+const getPriorityVideosLength = (endpoint, videos) => {
   if (!videos || !videos.length) {
     return 0;
   }
@@ -248,8 +260,7 @@ const findPriorityVideosLength = (endpoint, videos) => {
   // console.log({averageRequests, averageRequestsLength});
 
   for (let i = 1; i < filteredVideos.length; i++) {
-    if (endpoint.endpointId === filteredVideos[i].endpointId &&
-      filteredVideos[i].requests <= averageRequests) {
+    if (filteredVideos[i].requests <= averageRequests) {
       videosLength = i;
       break;
     }
@@ -262,14 +273,17 @@ const getVideosForEndpoint = (videos, endpointId) => {
   return videos.filter(value => value.endpointId === endpointId);
 };
 
+// TODO optimize that:
 const getServers = (X, splittedData, videos) => {
   // add latency to server
   let tempServers = {};
   for (let j = 0; j < splittedData.endpoints.length; j++) {
-    let latencies = Object.assign([], splittedData.endpoints[j].latencies);
+    console.log(`Servers filling with endpoint num ${j} of (${splittedData.endpoints.length})`);
+    let latencies = splittedData.endpoints[j].latencies;
     // console.log(latencies);
     for (let i = 0; i < latencies.length; i++) {
-      if (!tempServers[latencies[i].cacheServerId]) {
+      let tempServer = tempServers[latencies[i].cacheServerId];
+      if (!tempServer) {
         tempServers[latencies[i].cacheServerId] = {
           midLatency: 0,
           endpoints: []
@@ -286,28 +300,31 @@ const getServers = (X, splittedData, videos) => {
       });
     }
     for (let i = 0; i < latencies.length; i++) {
-      tempServers[latencies[i].cacheServerId].midLatency = tempServers[latencies[i].cacheServerId].midLatency / latencies.length;
+      let tempServer = tempServers[latencies[i].cacheServerId];
+      if (tempServer) {
+        tempServers[latencies[i].cacheServerId].midLatency /= latencies.length;
+        break;
+      }
     }
   }
 
   // console.log(tempServers);
+  // console.log(JSON.stringify(tempServers));
 
   console.log('Servers gathered with data!');
 
   // sort by min mid latency
   let sortedCacheServers = [];
-  for (let server in tempServers) {
-    if (tempServers.hasOwnProperty(server)) {
-      // console.log(tempServers);
-      sortedCacheServers.push({
-        remainingCapacity: X,
-        id: parseInt(server),
-        midLatency: parseInt(tempServers[server + ''].midLatency),
-        endpoints: tempServers[server + ''].endpoints,
-        videoIds: []
-      });
-    }
-  }
+  Object.keys(tempServers).forEach(function(server, index) {
+    // console.log({server, index});
+    sortedCacheServers.push({
+      remainingCapacity: X,
+      id: index,
+      midLatency: tempServers[server].midLatency,
+      endpoints: tempServers[server].endpoints,
+      videoIds: []
+    });
+  });
   sortedCacheServers.sort((a, b) => a.midLatency - b.midLatency);
   // console.log(sortedCacheServers);
 
@@ -344,16 +361,15 @@ const getCacheServersDistribution = (sortedCacheServersIn, videos) => {
 
   //fill em, first step (initial)
   for (let i = 0; i < sortedCacheServers.length; i++) {
-    console.log(`Working with server ${i}`);
+    console.log(`Working with server ${i} of (${sortedCacheServers.length})`);
 
     let cacheServer = sortedCacheServers[i];
 
-    // TODO
-    // let priorityEndpointsLength = 1;
+    const priorityEndpointsIds = getPriorityEndpointsIds(cacheServer.endpoints);
 
     for (let k = 0; k < cacheServer.endpoints.length; k++) {
       const endpoint = cacheServer.endpoints[k];
-      let priorityVideosLength = findPriorityVideosLength(endpoint, videos);
+      let priorityVideosLength = getPriorityVideosLength(endpoint, videos);
       // console.log('priorityVideosLength', priorityVideosLength);
 
       // console.log('sortedCacheServers[i]', cacheServer);
@@ -369,8 +385,9 @@ const getCacheServersDistribution = (sortedCacheServersIn, videos) => {
         }
 
         //fill by minimal latency only, requires second step
-        // console.log('videos[j]', videos[j]); // with endpointId
-        if (videoObj.endpointId !== cacheServer.endpoints[0].endpointId) {
+        // console.log('videoObj', videoObj); // with endpointId
+        // if (videoObj.endpointId !== cacheServer.endpoints[0].endpointId) {
+        if (priorityEndpointsIds.indexOf(videoObj.endpointId) < 0) {
           continue;
         }
 
@@ -389,13 +406,12 @@ const getCacheServersDistribution = (sortedCacheServersIn, videos) => {
 
   //fill servers, second step (sharding), check if video was already added!
   sortedCacheServers = sharding(sortedCacheServers, videos);
-
   console.log('Servers sharded');
 
   // console.log(JSON.stringify(sortedCacheServers));
   // console.log(sortedCacheServers);
 
-  // clearup servers if no videos on it
+  // cleanup servers if no videos on it
   sortedCacheServers = sortedCacheServers.filter(server => server.videoIds.length);
 
   // console.log(sortedCacheServers);

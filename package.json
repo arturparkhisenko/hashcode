@@ -11,9 +11,16 @@
   "license": "MIT",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node index.js"
+    "start": "node index.js",
+    "debug": "node --inspect index.js",
+    "optimize": "optimize-js index.js > output.js",
+    "build": "babel index.js -d index-es5.js --presets latest"
   },
   "dependencies": {
     "eslint": "^3.16.1"
+  },
+  "devDependencies": {
+    "babel-preset-latest": "^6.22.0",
+    "optimize-js": "^1.0.3"
   }
 }
