@@ -2,55 +2,85 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const cp = require('child_process');
+const async = require('async');
 
 const test = false;
 
 let files = test ? ['data-examples/example.in'] : [
   // 'data-examples/kittens.in',
-  // 'data-examples/me_at_the_zoo.in',
+  'data-examples/me_at_the_zoo.in',
   // 'data-examples/trending_today.in',
-  'data-examples/videos_worth_spreading.in'
+  // 'data-examples/videos_worth_spreading.in'
 ];
 
-// V E R C X (example: 10000 1000 200000 500 6000)
-//
-// V - videos,
-// E - endpoints,
-// R - request descriptions
-// C - cache servers
-// X - capacity in mb of each server
-//
+// V - videos E - endpoints R - requests C - cacheServers X - capacity
+// example: 10000 1000 200000 500 6000
 // s2 videos sizes
 // s3 endpoint {latency, cacheServersNum}
 // s4 videoStats {requests, id, endpointId}
 
-const CPUs = os.cpus().length;
-console.log(`OS cores (${CPUs})!`);
-
 // processes ------------------------------------------------------------------
 // https://nodejs.org/dist/latest-v7.x/docs/api/child_process.html
-
-const connectProcess = (process) => {
-  process.on('message', data => {
-    // type: then/catch
-    console.log('PARENT got data:', data);
-  });
-};
-let childProcesses = [];
-for (let i = 0; i < CPUs; i++) {
-  const process = cp.fork('./child-process-fork.js');
-  childProcesses.push(process);
-  connectProcess(process);
-}
-console.log(`Child Processes (${childProcesses.length}) was created!`);
 // Usage: process.send({ funcName: 'x', args: [] });
+
+// const CPUs = os.cpus().length;
+// console.log(`OS cores (${CPUs})!`);
+// const connectProcess = (process) => {
+//   process.on('message', data => {
+//     // type: then/catch
+//     console.log('PARENT got data:', data);
+//   });
+// };
+
+// let childProcesses = [];
+// for (let i = 0; i < CPUs; i++) {
+//   const process = cp.fork('./child-process-fork.js');
+//   childProcesses.push(process);
+//   connectProcess(process);
+// }
+// console.log(`Child Processes (${childProcesses.length}) was created!`);
+
+//TODO
+// Promise.all([p1, p2, p3]).then(values => {
+//   console.log(values); // [3, 1337, "foo"]
+// });
+//
+// for (let proc of childProcesses) {
+//   proc.send({
+//     funcName: 'getServers',
+//     args: [
+//       1,2,3
+//     ]
+//   });
+//   // getServers(X, splittedData, dataPartLength, videos)
+// }
+
+// TODO
+// async.parallel([
+//     function(callback) {
+//         fs.writeFile('testfile1', 'test1', callback);
+//     },
+//     function(callback) {
+//         fs.writeFile('testfile2', 'test2', callback);
+//     }
+// ]);
 
 // processes-end --------------------------------------------------------------
 
-for (const fileName of files) {
-  console.log(`Reading file: ${fileName}!`);
-  processFile(fileName);
-}
+// for (const fileName of files) {
+//   console.log(`Reading file: ${fileName}!`);
+//   processFile(fileName);
+// }
+
+async.each(files, function(file, callback) {
+  console.log(`Reading file: ${file}!`);
+  processFile(file);
+  callback();
+}, function(err) {
+  if (err) {
+    console.log('A file failed to process');
+  }
+});
 
 function processFile(fileName) {
   fs.readFile(path.resolve(__dirname, fileName), 'utf8',
@@ -95,43 +125,31 @@ function processFile(fileName) {
       let videos = splittedData.videoStats.sort(
         (a, b) => b.requests - a.requests
       );
-      // add video size
-      videos = videos.map((video, i) => {
+
+      let filledAndFilteredVideos = [];
+      for (let i = 0, l = videos.length; i < l; i++) {
+        let video = videos[i];
+        // add video size
         video.size = parseInt(videoSizes[videos[i].videoId]);
-        return video;
-      });
-      // delete video with size bigger than X capacity
-      videos = videos.filter(el => videoSizes[el.videoId] < X);
-      console.log('Videos sorted and filtered');
+        if (video.size > X) {
+          // skip video with size bigger than X capacity
+          continue;
+        }
+        filledAndFilteredVideos.push(video);
+      }
+      videos = filledAndFilteredVideos;
       // console.log(videos);
 
       const servers = getServers(X, splittedData, videos);
-
-      //TODO
-      // Promise.all([p1, p2, p3]).then(values => {
-      //   console.log(values); // [3, 1337, "foo"]
-      // });
-      //
-      // for (let proc of childProcesses) {
-      //   proc.send({
-      //     funcName: 'getServers',
-      //     args: [
-      //       1,2,3
-      //     ]
-      //   });
-      //   // getServers(X, splittedData, dataPartLength, videos)
-      // }
 
       console.log('Servers sorted / filtered / filled received!');
       const distribution = getCacheServersDistribution(servers, videos);
       console.log('Distribution finished!');
       const cacheServersNum = distribution.length;
-
-      let results = `${cacheServersNum}\n`;
-
       // console.log(distribution);
 
-      for (let i = 0; i < distribution.length; i++) {
+      let results = `${cacheServersNum}\n`;
+      for (let i = 0; i < cacheServersNum; i++) {
         results += `${distribution[i].id}`;
         for (let j = 0; j < distribution[i].videoIds.length; j++) {
           results += ` ${distribution[i].videoIds[j]}`;
@@ -270,10 +288,10 @@ const dataSplitter = (data = []) => {
 const sharding = (cacheServers, videos) => {
   //fill servers, second step (sharding), check if video was already added!
   let sortedCacheServers = Object.assign([], cacheServers);
-  for (let i = 0; i < sortedCacheServers.length; i++) {
+  for (let i = 0, scsl = sortedCacheServers.length; i < scsl; i++) {
     let cacheServer = sortedCacheServers[i];
     // console.log({cacheServer, videos});
-    for (let j = 0; j < videos.length; j++) {
+    for (let j = 0, vl = videos.length; j < vl; j++) {
       const videoObj = videos[j];
       // console.log('videosObj: ', videoObj); // with endpointId
       if (
@@ -299,7 +317,7 @@ const getPriorityVideosLength = (endpoint, videos) => {
 
   const filteredVideos = videos.filter(video => endpoint.endpointId === video.endpointId);
 
-  for (let i = 0; i < filteredVideos.length; i++) {
+  for (let i = 0, l = filteredVideos.length; i < l; i++) {
     if (endpoint.endpointId === filteredVideos[i].endpointId) {
       averageRequests += filteredVideos[i].requests;
       averageRequestsLength++;
@@ -308,7 +326,7 @@ const getPriorityVideosLength = (endpoint, videos) => {
   averageRequests /= averageRequestsLength;
   // console.log({averageRequests, averageRequestsLength});
 
-  for (let i = 1; i < filteredVideos.length; i++) {
+  for (let i = 1, l = filteredVideos.length; i < l; i++) {
     if (filteredVideos[i].requests <= averageRequests) {
       videosLength = i;
       break;
@@ -362,7 +380,7 @@ const getServers = (X, splittedData, videos) => {
     }
   }
 
-  console.log(tempServers);
+  // console.log(tempServers);
   // console.log(JSON.stringify(tempServers));
 
   console.log('Servers gathered with data!');
@@ -376,9 +394,25 @@ const getServers = (X, splittedData, videos) => {
   return tempServers;
 };
 
-// TODO requires parallel run
 const getCacheServersDistribution = (sortedCacheServersIn, videos) => {
   let sortedCacheServers = Object.assign([], sortedCacheServersIn);
+
+  // TODO
+  // async.forEachOf(obj, function (value, key, callback) {
+  //     fs.readFile(__dirname + value, "utf8", function (err, data) {
+  //         if (err) return callback(err);
+  //         try {
+  //             configs[key] = JSON.parse(data);
+  //         } catch (e) {
+  //             return callback(e);
+  //         }
+  //         callback();
+  //     });
+  // }, function (err) {
+  //     if (err) console.error(err.message);
+  //     // configs is now a map of JSON data
+  //     doSomethingWith(configs);
+  // });
 
   //fill em, first step (initial)
   for (let i = 0; i < sortedCacheServers.length; i++) {
@@ -435,9 +469,9 @@ const getCacheServersDistribution = (sortedCacheServersIn, videos) => {
   // console.log(sortedCacheServers);
 
   // kill all processes
-  for (let i = 0; i < childProcesses.length; i++) {
-    childProcesses[i].kill();
-  }
+  // for (let i = 0; i < childProcesses.length; i++) {
+  //   childProcesses[i].kill();
+  // }
 
   return sortedCacheServers;
 };
