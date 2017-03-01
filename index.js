@@ -2,7 +2,6 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const cp = require('child_process');
-const async = require('async');
 
 const test = false;
 
@@ -23,22 +22,22 @@ let files = test ? ['data-examples/example.in'] : [
 // https://nodejs.org/dist/latest-v7.x/docs/api/child_process.html
 // Usage: process.send({ funcName: 'x', args: [] });
 
-// const CPUs = os.cpus().length;
-// console.log(`OS cores (${CPUs})!`);
-// const connectProcess = (process) => {
-//   process.on('message', data => {
-//     // type: then/catch
-//     console.log('PARENT got data:', data);
-//   });
-// };
+const CPUs = os.cpus().length;
+console.log(`OS cores (${CPUs})!`);
+const connectProcess = (process) => {
+  process.on('message', data => {
+    // type: then/catch
+    console.log('PARENT got data:', data);
+  });
+};
 
-// let childProcesses = [];
-// for (let i = 0; i < CPUs; i++) {
-//   const process = cp.fork('./child-process-fork.js');
-//   childProcesses.push(process);
-//   connectProcess(process);
-// }
-// console.log(`Child Processes (${childProcesses.length}) was created!`);
+let childProcesses = [];
+for (let i = 0; i < CPUs; i++) {
+  const process = cp.fork('./child-process-fork.js');
+  childProcesses.push(process);
+  connectProcess(process);
+}
+console.log(`Child Processes (${childProcesses.length}) was created!`);
 
 //TODO
 // Promise.all([p1, p2, p3]).then(values => {
@@ -55,118 +54,113 @@ let files = test ? ['data-examples/example.in'] : [
 //   // getServers(X, splittedData, dataPartLength, videos)
 // }
 
-// TODO
-// async.parallel([
-//     function(callback) {
-//         fs.writeFile('testfile1', 'test1', callback);
-//     },
-//     function(callback) {
-//         fs.writeFile('testfile2', 'test2', callback);
-//     }
-// ]);
-
 // processes-end --------------------------------------------------------------
 
-// for (const fileName of files) {
-//   console.log(`Reading file: ${fileName}!`);
-//   processFile(fileName);
-// }
+let filesPromises = [];
+for (const fileName of files) {
+  console.log(`Reading file: ${fileName}!`);
+  filesPromises.push(processFile(fileName));
+}
 
-async.each(files, function(file, callback) {
-  console.log(`Reading file: ${file}!`);
-  processFile(file);
-  callback();
-}, function(err) {
-  if (err) {
-    console.log('A file failed to process');
+Promise.all(filesPromises).then(() => {
+  // kill all processes
+  for (let i = 0; i < childProcesses.length; i++) {
+    childProcesses[i].kill();
   }
+  console.log('Child Processes was killed!');
 });
 
 function processFile(fileName) {
-  fs.readFile(path.resolve(__dirname, fileName), 'utf8',
-    /**
-     * fs callback
-     * @param  {Object} err
-     * @param  {String} data
-     */
-    function(err, data) {
-      if (err) {
-        return console.log(err);
-      }
-
-      const timeLabel = `Time-for-${fileName}`;
-      console.time(timeLabel);
-      console.log(`File opened: ${fileName}!`);
-
-      let dataArray = data.split('\n');
-      if (dataArray[dataArray.length - 1] === '') {
-        dataArray.pop(); // trim trailing whitespace
-      }
-      // console.log(dataArray);
-      const firstLine = dataArray[0].split(' ');
-      // const V = parseInt(firstLine[0]);
-      // const E = parseInt(firstLine[1]);
-      // const R = parseInt(firstLine[2]);
-      // const C = parseInt(firstLine[3]);
-      const X = parseInt(firstLine[4]);
-      // console.log({V, E, R, C, X});
-
-      const videoSizes = dataArray[1].split(' ');
-      console.log('VideoSizes received!');
-      // console.log(videoSizes);
-      dataArray.shift(); // to get data only
-      dataArray.shift(); // to get data only
-      // console.log(dataArray);
-
-      const splittedData = dataSplitter(dataArray);
-      console.log('Data splitted!');
-
-      // sort videos by requests
-      let videos = splittedData.videoStats.sort(
-        (a, b) => b.requests - a.requests
-      );
-
-      let filledAndFilteredVideos = [];
-      for (let i = 0, l = videos.length; i < l; i++) {
-        let video = videos[i];
-        // add video size
-        video.size = parseInt(videoSizes[videos[i].videoId]);
-        if (video.size > X) {
-          // skip video with size bigger than X capacity
-          continue;
+  return new Promise((resolve, reject) => {
+    fs.readFile(path.resolve(__dirname, fileName), 'utf8',
+      /**
+       * fs callback
+       * @param  {Object} err
+       * @param  {String} data
+       */
+      function(err, data) {
+        if (err) {
+          console.log(err);
+          reject(err);
+          // return console.log(err);
         }
-        filledAndFilteredVideos.push(video);
-      }
-      videos = filledAndFilteredVideos;
-      // console.log(videos);
 
-      const servers = getServers(X, splittedData, videos);
+        const timeLabel = `Time-for-${fileName}`;
+        console.time(timeLabel);
+        console.log(`File opened: ${fileName}!`);
 
-      console.log('Servers sorted / filtered / filled received!');
-      const distribution = getCacheServersDistribution(servers, videos);
-      console.log('Distribution finished!');
-      const cacheServersNum = distribution.length;
-      // console.log(distribution);
-
-      let results = `${cacheServersNum}\n`;
-      for (let i = 0; i < cacheServersNum; i++) {
-        results += `${distribution[i].id}`;
-        for (let j = 0; j < distribution[i].videoIds.length; j++) {
-          results += ` ${distribution[i].videoIds[j]}`;
+        let dataArray = data.split('\n');
+        if (dataArray[dataArray.length - 1] === '') {
+          dataArray.pop(); // trim trailing whitespace
         }
-        results += `\n`;
+        // console.log(dataArray);
+        const firstLine = dataArray[0].split(' ');
+        // const V = parseInt(firstLine[0]);
+        // const E = parseInt(firstLine[1]);
+        // const R = parseInt(firstLine[2]);
+        // const C = parseInt(firstLine[3]);
+        const X = parseInt(firstLine[4]);
+        // console.log({V, E, R, C, X});
+
+        const videoSizes = dataArray[1].split(' ');
+        console.log('VideoSizes received!');
+        // console.log(videoSizes);
+        dataArray.shift(); // to get data only
+        dataArray.shift(); // to get data only
+        // console.log(dataArray);
+
+        const splittedData = dataSplitter(dataArray);
+        console.log('Data splitted!');
+
+        // sort videos by requests
+        let videos = splittedData.videoStats.sort(
+          (a, b) => b.requests - a.requests
+        );
+
+        let filledAndFilteredVideos = [];
+        for (let i = 0, l = videos.length; i < l; i++) {
+          let video = videos[i];
+          // add video size
+          video.size = parseInt(videoSizes[videos[i].videoId]);
+          if (video.size > X) {
+            // skip video with size bigger than X capacity
+            continue;
+          }
+          filledAndFilteredVideos.push(video);
+        }
+        videos = filledAndFilteredVideos;
+        // console.log(videos);
+
+        const servers = getServers(X, splittedData, videos);
+
+        console.log('Servers sorted / filtered / filled received!');
+        const distribution = getCacheServersDistribution(servers, videos);
+        console.log('Distribution finished!');
+        const cacheServersNum = distribution.length;
+        // console.log(distribution);
+
+        let results = `${cacheServersNum}\n`;
+        for (let i = 0; i < cacheServersNum; i++) {
+          results += `${distribution[i].id}`;
+          for (let j = 0; j < distribution[i].videoIds.length; j++) {
+            results += ` ${distribution[i].videoIds[j]}`;
+          }
+          results += `\n`;
+        }
+
+        // example: output to file
+        // 3 - how much cache servers
+        // serverId videoId videoId
+        // 0        2       3
+
+        console.log('\nDistribution results:\n', results);
+        writeResults(results, fileName);
+        console.timeEnd(timeLabel);
+
+        resolve();
       }
-
-      // example: output to file
-      // 3 - how much cache servers
-      // serverId videoId videoId
-      // 0        2       3
-
-      console.log('\nDistribution results:\n', results);
-      writeResults(results, fileName);
-      console.timeEnd(timeLabel);
-    }
-  );
+    );
+  });
 }
 
 // const toFastProperties = (o) => {
@@ -394,25 +388,9 @@ const getServers = (X, splittedData, videos) => {
   return tempServers;
 };
 
+// TODO requires parallel run
 const getCacheServersDistribution = (sortedCacheServersIn, videos) => {
   let sortedCacheServers = Object.assign([], sortedCacheServersIn);
-
-  // TODO
-  // async.forEachOf(obj, function (value, key, callback) {
-  //     fs.readFile(__dirname + value, "utf8", function (err, data) {
-  //         if (err) return callback(err);
-  //         try {
-  //             configs[key] = JSON.parse(data);
-  //         } catch (e) {
-  //             return callback(e);
-  //         }
-  //         callback();
-  //     });
-  // }, function (err) {
-  //     if (err) console.error(err.message);
-  //     // configs is now a map of JSON data
-  //     doSomethingWith(configs);
-  // });
 
   //fill em, first step (initial)
   for (let i = 0; i < sortedCacheServers.length; i++) {
@@ -465,13 +443,7 @@ const getCacheServersDistribution = (sortedCacheServersIn, videos) => {
 
   // cleanup servers if no videos on it
   sortedCacheServers = sortedCacheServers.filter(server => server.videoIds.length);
-
   // console.log(sortedCacheServers);
-
-  // kill all processes
-  // for (let i = 0; i < childProcesses.length; i++) {
-  //   childProcesses[i].kill();
-  // }
 
   return sortedCacheServers;
 };
