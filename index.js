@@ -7,9 +7,9 @@ const test = false;
 
 let files = test ? ['data-examples/example.in'] : [
   // 'data-examples/kittens.in',
-  'data-examples/me_at_the_zoo.in',
+  // 'data-examples/me_at_the_zoo.in',
   // 'data-examples/trending_today.in',
-  // 'data-examples/videos_worth_spreading.in'
+  'data-examples/videos_worth_spreading.in'
 ];
 
 // V E R C X (example: 10000 1000 200000 500 6000)
@@ -335,7 +335,7 @@ const getServers = (X, splittedData, videos) => {
           midLatency: 0,
           endpoints: [],
           remainingCapacity: X,
-          id: i,
+          id: numCacheServerId,
           videoIds: []
         };
       }
@@ -362,7 +362,7 @@ const getServers = (X, splittedData, videos) => {
     }
   }
 
-  // console.log(tempServers);
+  console.log(tempServers);
   // console.log(JSON.stringify(tempServers));
 
   console.log('Servers gathered with data!');
