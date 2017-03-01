@@ -320,36 +320,45 @@ const getPriorityVideosLength = (endpoint, videos) => {
 
 // TODO requires parallel run
 const getServers = (X, splittedData, videos) => {
-  // add latency to server
-  let tempServers = {};
+  //add latency to server
+  let tempServers = [];
   for (let j = 0; j < splittedData.endpoints.length; j++) {
     console.log(`Servers filling with endpoint num ${j} of (${splittedData.endpoints.length})`);
     let latencies = splittedData.endpoints[j].latencies;
     // console.log(latencies);
     for (let i = 0; i < latencies.length; i++) {
-      let tempServer = tempServers[latencies[i].cacheServerId];
-      if (!tempServer) {
-        tempServers[latencies[i].cacheServerId] = {
+      const numCacheServerId = latencies[i].cacheServerId;
+      let tempServer = tempServers[numCacheServerId];
+      if (typeof tempServer === 'undefined') {
+        //create server with full data
+        tempServers[numCacheServerId] = {
           midLatency: 0,
-          endpoints: []
+          endpoints: [],
+          remainingCapacity: X,
+          id: i,
+          videoIds: []
         };
       }
       //count mid latency
-      tempServers[latencies[i].cacheServerId].midLatency += latencies[i].latencyToTheCacheServer;
-
-      // endpoints
-      tempServers[latencies[i].cacheServerId].endpoints.push({
+      tempServers[numCacheServerId].midLatency += latencies[i].latencyToTheCacheServer;
+      //add endpoints
+      tempServers[numCacheServerId].endpoints.push({
         endpointId: j,
         latency: latencies[i].latencyToTheCacheServer,
         videos: getVideosForEndpoint(videos, j)
       });
     }
     for (let i = 0; i < latencies.length; i++) {
-      let tempServer = tempServers[latencies[i].cacheServerId];
-      if (tempServer) {
-        tempServers[latencies[i].cacheServerId].midLatency /= latencies.length;
+      //set midLatency
+      const numCacheServerId = latencies[i].cacheServerId;
+      let tempServer = tempServers[numCacheServerId];
+      if (typeof tempServer !== 'undefined') {
+        tempServer.midLatency /= latencies.length;
         break;
       }
+      // sort endpoints of each server by latency
+      tempServer.endpoints.sort((a, b) => a.latency - b.latency);
+      // console.log(tempServers);
     }
   }
 
@@ -358,30 +367,13 @@ const getServers = (X, splittedData, videos) => {
 
   console.log('Servers gathered with data!');
 
-  // sort by min mid latency
-  let sortedCacheServers = [];
-  Object.keys(tempServers).forEach(function(server, index) {
-    // console.log({server, index});
-    sortedCacheServers.push({
-      remainingCapacity: X,
-      id: index,
-      midLatency: tempServers[server].midLatency,
-      endpoints: tempServers[server].endpoints,
-      videoIds: []
-    });
-  });
-  sortedCacheServers.sort((a, b) => a.midLatency - b.midLatency);
-  // console.log(sortedCacheServers);
+  //sort by min mid latency
+  tempServers.sort((a, b) => a.midLatency - b.midLatency);
+  // console.log(tempServers);
 
-  // sort endpoints of each server by latency
-  for (let i = 0; i < sortedCacheServers.length; i++) {
-    sortedCacheServers[i].endpoints.sort((a, b) => a.latency - b.latency);
-  }
-  // console.log(sortedCacheServers);
+  console.log(`Servers (${tempServers.length}) sorted and filled with endpoints`);
 
-  console.log(`Servers (${sortedCacheServers.length}) sorted and filled with endpoints`);
-
-  return sortedCacheServers;
+  return tempServers;
 };
 
 // TODO requires parallel run
