@@ -334,11 +334,11 @@ const getPriorityVideosLength = (endpoint, videos) => {
 const getServers = (X, splittedData, videos) => {
   //add latency to server
   let tempServers = [];
-  for (let j = 0; j < splittedData.endpoints.length; j++) {
+  for (let j = 0, l = splittedData.endpoints.length; j < l; j++) {
     console.log(`Servers filling with endpoint num ${j} of (${splittedData.endpoints.length})`);
     let latencies = splittedData.endpoints[j].latencies;
     // console.log(latencies);
-    for (let i = 0; i < latencies.length; i++) {
+    for (let i = 0, ll = latencies.length; i < ll; i++) {
       const numCacheServerId = latencies[i].cacheServerId;
       let tempServer = tempServers[numCacheServerId];
       if (typeof tempServer === 'undefined') {
@@ -360,18 +360,16 @@ const getServers = (X, splittedData, videos) => {
         videos: getVideosForEndpoint(videos, j)
       });
     }
-    for (let i = 0; i < latencies.length; i++) {
-      //set midLatency
-      const numCacheServerId = latencies[i].cacheServerId;
-      let tempServer = tempServers[numCacheServerId];
-      if (typeof tempServer !== 'undefined') {
-        tempServer.midLatency /= latencies.length;
-        break;
-      }
-      // sort endpoints of each server by latency
-      tempServer.endpoints.sort((a, b) => a.latency - b.latency);
-      // console.log(tempServers);
-    }
+  }
+
+  for (let i = 0, l = tempServers.length; i < l; i++) {
+    let tempServer = tempServers[i];
+    //set midLatency
+    tempServer.midLatency /= tempServer.endpoints.length;
+    // sort endpoints of each server by latency
+    tempServer.endpoints.sort((a, b) => a.latency - b.latency);
+    // console.log(tempServers);
+    console.log(`ID:${tempServer.id}`, tempServer);
   }
 
   // console.log(tempServers);
@@ -435,7 +433,7 @@ const getCacheServersDistribution = (sortedCacheServersIn, videos) => {
   }
 
   //fill servers, second step (sharding), check if video was already added!
-  sortedCacheServers = sharding(sortedCacheServers, videos);
+  // sortedCacheServers = sharding(sortedCacheServers, videos);
   console.log('Servers sharded');
 
   // console.log(JSON.stringify(sortedCacheServers));
