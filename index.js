@@ -7,9 +7,9 @@ const test = false;
 
 let files = test ? ['data-examples/example.in'] : [
   // 'data-examples/kittens.in',
-  'data-examples/me_at_the_zoo.in',
-  // 'data-examples/trending_today.in',
-  // 'data-examples/videos_worth_spreading.in'
+  // 'data-examples/me_at_the_zoo.in',
+  'data-examples/trending_today.in',
+  'data-examples/videos_worth_spreading.in'
 ];
 
 // V - videos E - endpoints R - requests C - cacheServers X - capacity
@@ -58,7 +58,6 @@ console.log(`Child Processes (${childProcesses.length}) was created!`);
 
 let filesPromises = [];
 for (const fileName of files) {
-  console.log(`Reading file: ${fileName}!`);
   filesPromises.push(processFile(fileName));
 }
 
@@ -87,7 +86,7 @@ function processFile(fileName) {
 
         const timeLabel = `Time-for-${fileName}`;
         console.time(timeLabel);
-        console.log(`File opened: ${fileName}!`);
+        console.log(`Processing file: ${fileName}!`);
 
         let dataArray = data.split('\n');
         if (dataArray[dataArray.length - 1] === '') {
@@ -369,7 +368,7 @@ const getServers = (X, splittedData, videos) => {
     // sort endpoints of each server by latency
     tempServer.endpoints.sort((a, b) => a.latency - b.latency);
     // console.log(tempServers);
-    console.log(`ID:${tempServer.id}`, tempServer);
+    // console.log(`ID:${tempServer.id}`, tempServer);
   }
 
   // console.log(tempServers);
@@ -397,9 +396,18 @@ const getCacheServersDistribution = (sortedCacheServersIn, videos) => {
     let cacheServer = sortedCacheServers[i];
     const priorityEndpointsIds = getPriorityEndpointsIds(cacheServer.endpoints);
 
+    // if (i === 0) {
+    //   let priorityVideosLength = getPriorityVideosLength(cacheServer.endpoints[0], videos);
+    //   console.log('cacheServer',cacheServer);
+    //   console.log('priorityEndpointsIds', priorityEndpointsIds);
+    //   console.log('cacheServer.endpoints', cacheServer.endpoints);
+    //   console.log('cacheServer.endpoints[0].videos', cacheServer.endpoints[0].videos);
+    //   console.log('priorityVideosLength', priorityVideosLength);
+    // }
+
     for (let k = 0; k < cacheServer.endpoints.length; k++) {
       const endpoint = cacheServer.endpoints[k];
-      let priorityVideosLength = getPriorityVideosLength(endpoint, videos);
+      // let priorityVideosLength = getPriorityVideosLength(endpoint, videos);
       // console.log({cacheServer, priorityVideosLength});
 
       //loop through videos to check if one of them have to be added
@@ -408,9 +416,9 @@ const getCacheServersDistribution = (sortedCacheServersIn, videos) => {
         const videoObj = endpoint.videos[j];
 
         //when to start sharding
-        if (priorityVideosLength === 0) {
-          break;
-        }
+        // if (priorityVideosLength === 0) {
+        //   break;
+        // }
 
         //fill by minimal latency only, requires second step
         // console.log('videoObj', videoObj); // with endpointId
@@ -426,14 +434,14 @@ const getCacheServersDistribution = (sortedCacheServersIn, videos) => {
         ) {
           cacheServer.remainingCapacity -= videoObj.size;
           cacheServer.videoIds.push(videoObj.videoId);
-          priorityVideosLength--;
+          // priorityVideosLength--;
         }
       }
     }
   }
 
   //fill servers, second step (sharding), check if video was already added!
-  // sortedCacheServers = sharding(sortedCacheServers, videos);
+  sortedCacheServers = sharding(sortedCacheServers, videos);
   console.log('Servers sharded');
 
   // console.log(JSON.stringify(sortedCacheServers));
