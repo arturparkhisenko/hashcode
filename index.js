@@ -211,6 +211,35 @@ const getLatencies = (data, index, num) => {
   return result;
 };
 
+const getPriorityVideosParams = (endpoint, videos) => {
+  if (!videos || !videos.length) {
+    return 0;
+  }
+  let videosLength = 1;
+  let averageRequests = 0;
+  let averageRequestsLength = 0;
+
+  const filteredVideos = videos.filter(video => endpoint.id === video.endpointId);
+
+  for (let i = 0, l = filteredVideos.length; i < l; i++) {
+    if (endpoint.id === filteredVideos[i].endpointId) {
+      averageRequests += filteredVideos[i].requests;
+      averageRequestsLength++;
+    }
+  }
+  averageRequests /= averageRequestsLength;
+  // console.log({averageRequests, averageRequestsLength});
+
+  for (let i = 1, l = filteredVideos.length; i < l; i++) {
+    if (filteredVideos[i].requests <= averageRequests) {
+      videosLength = i;
+      break;
+    }
+  }
+
+  return {videosLength, filteredVideos};
+};
+
 // get-end --------------------------------------------------------------------
 
 const dataSplitter = (data = []) => {
@@ -225,11 +254,19 @@ const dataSplitter = (data = []) => {
       //for latencies
       let latencies = parseInt(line[1]) ? getLatencies(data, i + 1, parseInt(line[1])) : [];
       // latencies = JSON.stringify(latencies);
+      let sortedLatencies = latencies.sort((a, b) => {
+        return a.latencyToTheCacheServer - b.latencyToTheCacheServer;
+      });
+      const dcLatency = parseInt(line[0]);
+      const bestLatency = sortedLatencies.length ? sortedLatencies[0].latencyToTheCacheServer : dcLatency;
+      // console.log('dcLatency', dcLatency);
+      // console.log('saved', dcLatency - bestLatency);
       let endpoint = {
         id: currentEndpointId,
-        latency: parseInt(line[0]),
+        latency: dcLatency,
+        saved: dcLatency - bestLatency,
         cacheServersNum: parseInt(line[1]),
-        latencies: latencies
+        latencies: sortedLatencies
       };
       result.endpoints.push(endpoint);
       currentEndpointId++;
@@ -246,7 +283,9 @@ const dataSplitter = (data = []) => {
       if (existingVideoId >= 0) {
         result.videoStats[existingVideoId].requests += video.requests;
       } else {
-        result.videoStats.push(video);
+        if (video.requests > 0) {
+          result.videoStats.push(video);
+        }
       }
     }
   }
@@ -260,63 +299,100 @@ const getServers = (X, splittedData, videos) => {
 
   // req * saved ms / video requests summ
   //  #3 900        #4 0
-  // (1500 * 900 + 500 * 0 + 1000 * 800 + 1000 * 900)/(1500 + 500 + 1000 + 1000) = 762.5
+  // (1500 * 900 + 500 * 0 + 1000 * 800 + 1000 * 0)/(1500 + 500 + 1000 + 1000) = 762.5
 
-  //TODO loop through endpoints primary
+  // TODO
+  // for (let j = 0, el = splittedData.endpoints.length; j < el; j++) {
+  //   console.log(`Calc Score, Current endpoint: (${j}) of (${el - 1})`);
+  //   const endpoint = splittedData.endpoints[j];
+  //   let leftAccum = 0;
+  //   let rightAccum = 0;
+  //
+  //   console.log(`endpoint.saved ${endpoint.saved}, endpoint.score ${endpoint.score}`);
+  //
+  //   for (let i = 0, l = videos.length; i < l; i++) {
+  //     const video = videos[i];
+  //     if (endpoint.id !== video.endpointId) {
+  //       continue;
+  //     }
+  //     leftAccum += video.requests * endpoint.saved;
+  //     rightAccum += video.requests;
+  //   }
+  //
+  //   endpoint.score = leftAccum / rightAccum;
+  //
+  //   console.log(`endpoint.saved ${endpoint.saved}, endpoint.score ${endpoint.score}`);
+  // }
 
-  for (let i = 0, l = videos.length; i < l; i++) {
-    console.log(`Current video: (${i}) of (${l - 1})`);
+  //sort by max latency
+  // const endpoints = splittedData.endpoints.sort((a, b) => b.latency - a.latency);
+  // const endpoints = splittedData.endpoints.sort((a, b) => b.saved - a.saved);
+  const endpoints = splittedData.endpoints.sort((a, b) => b.latency - a.latency && b.saved - a.saved);
+  // console.log(endpoints);
+  for (let j = 0, el = endpoints.length; j < el; j++) {
+    console.log(`Current endpoint: (${j}) of (${el - 1})`);
+    const endpoint = endpoints[j];
 
-    const video = videos[i];
-    const endpoint = splittedData.endpoints[video.endpointId];
-    // sort servers by latency
-    const servers = endpoint.latencies.sort((a, b) => {
-      return a.latencyToTheCacheServer - b.latencyToTheCacheServer;
-    });
+    const videosParams = getPriorityVideosParams(endpoint, videos);
+    const priorityVideosLength = videosParams.videosLength;
+    const videosOfCurrentEndpoint = videosParams.filteredVideos;
 
-    let videoWasAdded = false;
+    // for (let i = 0, l = videos.length; i < l; i++) {
+    for (let i = 0, l = priorityVideosLength; i < l; i++) {
+      // const video = videos[i];
+      const video = videosOfCurrentEndpoint[i];
 
-    //loop through servers to find a space for a video
-    for (let j = 0, ll = servers.length; j < ll; j++) {
-      if (videoWasAdded) {
-        break;
-      }
+      // if (endpoint.id !== video.endpointId) {
+      //   continue;
+      // }
 
-      let serverId = servers[j].cacheServerId;
-      //find server
-      const serverIndex = checkIfObjWithIdFoundInArr(tempServers, serverId, 'id');
+      // sort servers by latency
+      const servers = endpoint.latencies;
 
-      if (serverIndex < 0) {
-        //create server and fill it with defaults
-        tempServers.push({
-          maxRequests: video.requests,
-          remainingCapacity: X - video.size,
-          id: serverId,
-          videoIds: [video.videoId]
-        });
-        videoWasAdded = true;
-      } else {
-        //fill
-        let server = tempServers[serverIndex];
-        const duplicate = checkIfVideoIsIn(server.videoIds, video.videoId);
-        if (duplicate) {
+      let videoWasAdded = false;
+
+      //loop through servers to find a space for a video
+      for (let j = 0, ll = servers.length; j < ll; j++) {
+        if (videoWasAdded) {
           break;
         }
-        const enoughSpace = checkCapacity(video.size + 1, server.remainingCapacity);
-        if (!enoughSpace) {
-          continue;
+
+        let serverId = servers[j].cacheServerId;
+        //find server
+        const serverIndex = checkIfObjWithIdFoundInArr(tempServers, serverId, 'id');
+
+        if (serverIndex < 0) {
+          //create server and fill it with defaults
+          tempServers.push({
+            maxRequests: video.requests,
+            remainingCapacity: X - video.size,
+            id: serverId,
+            videoIds: [video.videoId]
+          });
+          videoWasAdded = true;
+        } else {
+          //fill
+          let server = tempServers[serverIndex];
+          const duplicate = checkIfVideoIsIn(server.videoIds, video.videoId);
+          if (duplicate) {
+            break;
+          }
+          const enoughSpace = checkCapacity(video.size + 1, server.remainingCapacity);
+          if (!enoughSpace) {
+            continue;
+          }
+
+          server.maxRequests += video.requests;
+          server.remainingCapacity -= video.size;
+          server.videoIds.push(video.videoId);
+
+          // if (server.id === 0) {
+          //   console.log(`videoID ### ${video.videoId} size ${video.size}, serverId ${serverId}, remainingCapacity ${server.remainingCapacity}, enoughSpace ${enoughSpace}`);
+          //   console.log(`server ${JSON.stringify(server)}`);
+          // }
+
+          videoWasAdded = true;
         }
-
-        server.maxRequests += video.requests;
-        server.remainingCapacity -= video.size;
-        server.videoIds.push(video.videoId);
-
-        // if (server.id === 0) {
-        //   console.log(`videoID ### ${video.videoId} size ${video.size}, serverId ${serverId}, remainingCapacity ${server.remainingCapacity}, enoughSpace ${enoughSpace}`);
-        //   console.log(`server ${JSON.stringify(server)}`);
-        // }
-
-        videoWasAdded = true;
       }
     }
   }
