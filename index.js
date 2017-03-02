@@ -271,7 +271,6 @@ const dataSplitter = (data = []) => {
       result.endpoints.push(endpoint);
       currentEndpointId++;
       i += endpoint.cacheServersNum;
-      continue;
     } else if (line.length === 3) {
       //for videos
       let video = {
