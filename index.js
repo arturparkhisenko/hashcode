@@ -39,7 +39,6 @@ let files = test ? ['data-examples/example.in'] : [
 // }
 // console.log(`Child Processes (${childProcesses.length}) was created!`);
 
-//TODO
 // Promise.all([p1, p2, p3]).then(values => {
 //   console.log(values); // [3, 1337, "foo"]
 // });
@@ -58,17 +57,21 @@ let files = test ? ['data-examples/example.in'] : [
 
 // zip ------------------------------------------------------------------------
 const archiver = require('archiver');
-fs.unlink(__dirname + '/data-examples/code.zip', ()=>{});
+fs.unlink(__dirname + '/data-examples/code.zip', () => {});
 // create a file to stream archive data to.
 const output = fs.createWriteStream(__dirname + '/data-examples/code.zip');
 const archive = archiver('zip', {
-    store: true // Sets the compression method to STORE.
+  store: true // Sets the compression method to STORE.
 });
 // pipe archive data to the file
 archive.pipe(output);
 // append a files from stream
-archive.append(fs.createReadStream(__dirname + '/index.js'), { name: 'index.js' });
-archive.append(fs.createReadStream(__dirname + '/package.json'), { name: 'package.json' });
+archive.append(fs.createReadStream(__dirname + '/index.js'), {
+  name: 'index.js'
+});
+archive.append(fs.createReadStream(__dirname + '/package.json'), {
+  name: 'package.json'
+});
 // finalize the archive (ie we are done appending files but streams have to finish yet)
 archive.finalize();
 // zip-end --------------------------------------------------------------------
@@ -245,16 +248,24 @@ const getPriorityVideosParams = (endpoint, videos) => {
     }
   }
   averageRequests /= averageRequestsLength;
+  // mod by %
+  let averageRequestsMod = Math.round(averageRequests * 0.5);
+  if (averageRequestsMod < 0) {
+    averageRequestsMod = averageRequests;
+  }
   // console.log({averageRequests, averageRequestsLength});
 
   for (let i = 1, l = filteredVideos.length; i < l; i++) {
-    if (filteredVideos[i].requests <= averageRequests) {
+    if (filteredVideos[i].requests <= averageRequestsMod) {
       videosLength = i;
       break;
     }
   }
 
-  return {videosLength, filteredVideos};
+  return {
+    videosLength,
+    filteredVideos
+  };
 };
 
 // get-end --------------------------------------------------------------------
@@ -309,6 +320,39 @@ const dataSplitter = (data = []) => {
   return result;
 };
 
+// const checkIfEndpointFound = (endpoints, videoId) => {
+//   let result = false;
+//   for (let endpoint of endpoints) {
+//     if (endpoint.endpointId === videoId) {
+//       result = true;
+//       break;
+//     }
+//   }
+//   return result;
+// };
+
+// const sharding = (cacheServers, videos) => {
+//   //fill servers, second step (sharding), check if video was already added!
+//   let sortedCacheServers = Object.assign([], cacheServers);
+//   for (let i = 0, scsl = sortedCacheServers.length; i < scsl; i++) {
+//     let cacheServer = sortedCacheServers[i];
+//     // console.log({cacheServer, videos});
+//     for (let j = 0, vl = videos.length; j < vl; j++) {
+//       const videoObj = videos[j];
+//       // console.log('videosObj: ', videoObj); // with endpointId
+//       if (
+//         checkIfEndpointFound(cacheServer.endpoints, videoObj.endpointId) &&
+//         checkCapacity(videoObj.size, cacheServer.remainingCapacity) &&
+//         checkIfVideoIsIn(cacheServer.videoIds, videoObj.videoId)
+//       ) {
+//         cacheServer.remainingCapacity -= videoObj.size;
+//         cacheServer.videoIds.push(videoObj.videoId);
+//       }
+//     }
+//   }
+//   return sortedCacheServers;
+// };
+
 const getServers = (X, splittedData, videos) => {
   //add latency to server
   let tempServers = [];
@@ -317,15 +361,12 @@ const getServers = (X, splittedData, videos) => {
   //  #3 900        #4 0
   // (1500 * 900 + 500 * 0 + 1000 * 800 + 1000 * 0)/(1500 + 500 + 1000 + 1000) = 762.5
 
-  // TODO
   // for (let j = 0, el = splittedData.endpoints.length; j < el; j++) {
   //   console.log(`Calc Score, Current endpoint: (${j}) of (${el - 1})`);
   //   const endpoint = splittedData.endpoints[j];
   //   let leftAccum = 0;
   //   let rightAccum = 0;
-  //
   //   console.log(`endpoint.saved ${endpoint.saved}, endpoint.score ${endpoint.score}`);
-  //
   //   for (let i = 0, l = videos.length; i < l; i++) {
   //     const video = videos[i];
   //     if (endpoint.id !== video.endpointId) {
@@ -334,16 +375,14 @@ const getServers = (X, splittedData, videos) => {
   //     leftAccum += video.requests * endpoint.saved;
   //     rightAccum += video.requests;
   //   }
-  //
   //   endpoint.score = leftAccum / rightAccum;
-  //
   //   console.log(`endpoint.saved ${endpoint.saved}, endpoint.score ${endpoint.score}`);
   // }
 
-  //sort by max latency
+  //sort by
   // const endpoints = splittedData.endpoints.sort((a, b) => b.latency - a.latency);
-  // const endpoints = splittedData.endpoints.sort((a, b) => b.saved - a.saved);
-  const endpoints = splittedData.endpoints.sort((a, b) => b.latency - a.latency && b.saved - a.saved);
+  const endpoints = splittedData.endpoints.sort((a, b) => b.saved - a.saved);
+  // const endpoints = splittedData.endpoints.sort((a, b) => b.latency - a.latency && b.saved - a.saved);
   // console.log(endpoints);
   for (let j = 0, el = endpoints.length; j < el; j++) {
     console.log(`Current endpoint: (${j}) of (${el - 1})`);
@@ -355,9 +394,10 @@ const getServers = (X, splittedData, videos) => {
 
     // for (let i = 0, l = videos.length; i < l; i++) {
     for (let i = 0, l = priorityVideosLength; i < l; i++) {
-      // const video = videos[i];
       const video = videosOfCurrentEndpoint[i];
 
+      // if not by priority
+      // const video = videos[i];
       // if (endpoint.id !== video.endpointId) {
       //   continue;
       // }
@@ -402,11 +442,6 @@ const getServers = (X, splittedData, videos) => {
           server.remainingCapacity -= video.size;
           server.videoIds.push(video.videoId);
 
-          // if (server.id === 0) {
-          //   console.log(`videoID ### ${video.videoId} size ${video.size}, serverId ${serverId}, remainingCapacity ${server.remainingCapacity}, enoughSpace ${enoughSpace}`);
-          //   console.log(`server ${JSON.stringify(server)}`);
-          // }
-
           videoWasAdded = true;
         }
       }
@@ -418,11 +453,13 @@ const getServers = (X, splittedData, videos) => {
 
   console.log('Servers gathered with data!');
 
-  // TODO sort servers by all requests
+  // sort servers by all requests
   tempServers.sort((a, b) => b.maxRequests - a.maxRequests);
   // console.log({tempServers});
 
   console.log(`Servers (${tempServers.length}) sorted and filled with endpoints`);
+
+  // tempServers = sharding(tempServers, videos);
 
   return tempServers;
 };
