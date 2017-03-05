@@ -4,6 +4,8 @@
 
 - [hashcode2017_streaming_videos](hashcode2017_streaming_videos.pdf)
 
+**Team:** [@arturparkhisenko](https://github.com/arturparkhisenko) and [@dmytraw (Dmytraw Murzenkov) ](https://github.com/dmytraw)
+
 ## Results:
 
 ### Online Qualification Round
@@ -18,6 +20,6 @@
 
 ## How it should be solved?
 
-Using graph algorithms
+Using graph algorithms or Knapsack/rucksack method
 
 ## [MIT License](LICENSE)
