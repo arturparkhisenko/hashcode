@@ -16,7 +16,7 @@
 ### Extended Round
 
 - World: 501 place, 2096930 score
-- Ukraine: 20 place, 2096930 score
+- Ukraine: 21 place, 2096930 score
 
 ## How it should be solved?
 
