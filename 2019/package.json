@@ -1,0 +1,28 @@
+{
+  "name": "hashcode-2019",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arturparkhisenko/hashcode.git"
+  },
+  "author": "arturparkhisenko",
+  "contributors": [
+    "arturparkhisenko",
+    "dmytraw",
+    "VitaliyLamash"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js",
+    "build": "NODE_ENV=production npm start",
+    "debug": "node --inspect index.js"
+  },
+  "devDependencies": {
+    "eslint": "^5.14.1"
+  },
+  "dependencies": {
+    "archiver": "^3.0.0"
+  }
+}
