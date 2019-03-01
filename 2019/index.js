@@ -68,18 +68,26 @@ function processFile(fileName) {
         dataArray.shift(); // to get data only
 
         let photos = parsePhotos(dataArray);
+        let photosMap = {};
+        photos.forEach(photo => photosMap[photo.i] = photo);
         console.log('photosLength', photosLength, 'photos', photos);
 
-        // slide: {getPhotos():[photo1, photo2], getTags(): [tag1, tag2], hasSpace(): getPhotos().length < 2}
+        let hPhotos = photos.filter(photo => photo.orientation === 'H');
+        let vPhotos = photos.filter(photo => photo.orientation === 'V');
+        let slides = [...hPhotos.map(photo => new Slide(photo.i))];
+        // 1. make a V+V slides first, using findHighestInterestFactorPair
+        let slidesWithVerticalPhotos = getSlidesWithVerticalPhotos(vPhotos);
+        slides.push(slidesWithVerticalPhotos);
 
-        // 1. make a V+V slides first findHighestInterestFactorPair
-        // 2. now when we have all slides, we need to find a chain with highest interest
-        // 3. we can try to do it one by one, filling one max pair after another by
+        // 2. now when we have all slides, we need to find a chain with highest interest,
+        // aka sort, we can try to do it one by one, filling one max pair after another by
         // searching a max pair for the last element in chain
-        // 4. Find a score for the album by counting all slides interest factor summation.
+        let sortedSlides = [];
+
+        // 3. Find a score for the album by counting all slides interest factor summation.
 
         let results = '';
-        // schedule.forEach(result => {
+        // sortedSlides.forEach(result => {
         //   results +=
         //     result.length.toString() + ' ' + result.join` `.trim() + '\n';
         // });
@@ -100,6 +108,27 @@ function processFile(fileName) {
 
 // --------------------------------------
 
+class Slide {
+  constructor(photoId1, photoId2 = null) {
+    this.photos = [photoId1];
+    if (photoId2 !== null) {
+      this.photos.push(photoId2);
+    }
+  }
+  getPhotoIds() {
+    return this.photos;
+  }
+  getTags() {
+    return Array.from(
+      new Set(
+        this.getPhotos()
+          .map(photo => photo.tags)
+          .flat(1)
+      )
+    );
+  }
+}
+
 function parsePhotos(data) {
   let i, line, photo;
   let length = data.length;
@@ -117,6 +146,10 @@ function parsePhotos(data) {
   return result;
 }
 
+function getSlidesWithVerticalPhotos(verticalPhotos) {
+  return [new Slide()];
+}
+
 /**
  * For two subsequent slides Si and Si+1,
  * the interest factor is the minimum (the smallest number of the three) of:
@@ -128,5 +161,14 @@ function parsePhotos(data) {
  * @returns {Array} pair
  */
 function findHighestInterestFactorPair(data) {
-  return { pair: [{}, {}], interestFactor: Math.min(0)};
+  let a, b, differenceA, differenceB, intersection;
+
+  differenceA = a.filter(x => !b.includes(x));
+  differenceB = b.filter(x => !a.includes(x));
+  intersection = a.filter(x => b.includes(x));
+
+  return {
+    pair: [a, b],
+    interestFactor: Math.min(differenceA, differenceB, intersection)
+  };
 }
