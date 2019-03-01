@@ -25,7 +25,6 @@ Promise.all(filesPromises).then(() => {
 });
 
 // --------------------------------------
-let time;
 
 /**
  * writeResults
@@ -69,7 +68,7 @@ function processFile(fileName) {
 
         let photos = parsePhotos(dataArray);
         let photosMap = {};
-        photos.forEach(photo => photosMap[photo.id] = photo);
+        photos.forEach(photo => (photosMap[photo.id] = photo));
         console.log('photosLength', photosLength, 'photos', photos);
 
         let hPhotos = photos.filter(photo => photo.orientation === 'H');
@@ -80,8 +79,10 @@ function processFile(fileName) {
         slides.push(slidesWithVerticalPhotos);
 
         // 2. now when we have all slides, we need to find a chain with highest interest,
-        // aka sort, we can try to do it one by one, filling one max pair after another by
-        // searching a max pair for the last element in chain
+        // aka sort, we can try to do it one by one
+        // when we found a first max interest factor pair, we need to add his pairs from left and right
+        // if left part is bigger than right - then pick left
+        // and then add left parts for the left, and right parts to the right
         let sortedSlides = [];
 
         // 3. Find a score for the album by counting all slides interest factor summation.
@@ -146,7 +147,11 @@ function parsePhotos(data) {
   return result;
 }
 
-function getSlidesWithVerticalPhotos(verticalPhotos) {
+function getSlidesWithVerticalPhotos(vPhotos) {
+  let slides = [];
+  let singlePhotoSlides = vPhotos.map(photo => new Slide(photo.id));
+  // in for loop build a slides one by one using findHighestInterestFactorPair(restOfSinglePhotoSlides);
+
   return [new Slide()];
 }
 
@@ -157,18 +162,26 @@ function getSlidesWithVerticalPhotos(verticalPhotos) {
  * ● the number of tags in Si but not in Si+1
  * ● the number of tags in Si+1 but not in Si.
  *
- * @param {*} data
- * @returns {Array} pair
+ * @param {Array} slides
+ * @returns {Array} pair of slides
  */
-function findHighestInterestFactorPair(data) {
-  let a, b, differenceA, differenceB, intersection;
+function findHighestInterestFactorPair(slides) {
+  let aSlide,
+    bSlide,
+    aTags,
+    bTags,
+    differenceA,
+    differenceB,
+    intersection,
+    interestFactor;
 
-  differenceA = a.filter(x => !b.includes(x));
-  differenceB = b.filter(x => !a.includes(x));
-  intersection = a.filter(x => b.includes(x));
+  // differenceA = aTags.filter(x => !bTags.includes(x));
+  // differenceB = bTags.filter(x => !aTags.includes(x));
+  // intersection = aTags.filter(x => bTags.includes(x));
+  // interestFactor = Math.min(differenceA, differenceB, intersection);
 
   return {
-    pair: [a, b],
-    interestFactor: Math.min(differenceA, differenceB, intersection)
+    pair: [aSlide, bSlide],
+    interestFactor
   };
 }
