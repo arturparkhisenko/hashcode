@@ -69,12 +69,12 @@ function processFile(fileName) {
 
         let photos = parsePhotos(dataArray);
         let photosMap = {};
-        photos.forEach(photo => photosMap[photo.i] = photo);
+        photos.forEach(photo => photosMap[photo.id] = photo);
         console.log('photosLength', photosLength, 'photos', photos);
 
         let hPhotos = photos.filter(photo => photo.orientation === 'H');
         let vPhotos = photos.filter(photo => photo.orientation === 'V');
-        let slides = [...hPhotos.map(photo => new Slide(photo.i))];
+        let slides = [...hPhotos.map(photo => new Slide(photo.id))];
         // 1. make a V+V slides first, using findHighestInterestFactorPair
         let slidesWithVerticalPhotos = getSlidesWithVerticalPhotos(vPhotos);
         slides.push(slidesWithVerticalPhotos);
@@ -139,7 +139,7 @@ function parsePhotos(data) {
       orientation: line.shift(),
       tagsLength: Number(line.shift()),
       tags: line,
-      i
+      id: i
     };
     result.push(photo);
   }
