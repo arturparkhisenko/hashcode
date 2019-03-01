@@ -5,13 +5,13 @@ const zip = require('./zip.js');
 const test = process.env.NODE_ENV !== 'production';
 
 const files = test
-  ? ['data-examples/a_example.in']
+  ? ['data-examples/a_example.txt']
   : [
-      'data-examples/a_example.in',
-      'data-examples/b_lovely_landscapes.in',
-      'data-examples/c_memorable_moments.in',
-      'data-examples/d_pet_pictures.in',
-      'data-examples/e_shiny_selfies.in'
+      'data-examples/a_example.txt',
+      'data-examples/b_lovely_landscapes.txt',
+      'data-examples/c_memorable_moments.txt',
+      'data-examples/d_pet_pictures.txt',
+      'data-examples/e_shiny_selfies.txt'
     ];
 
 let filesPromises = [];
@@ -61,55 +61,33 @@ function processFile(fileName) {
         if (dataArray[dataArray.length - 1] === '') {
           dataArray.pop(); // trim trailing whitespace
         }
-        const firstLine = dataArray[0].split(' ');
-        // const R = parseInt(firstLine[0]);
-        // const C = parseInt(firstLine[1]);
-        const F = parseInt(firstLine[2]);
-        // const N = parseInt(firstLine[3]);
-        // const B = parseInt(firstLine[4]);
-        const T = parseInt(firstLine[5]);
-        time = T;
+
+        const firstLine = dataArray[0];
+        const photosLength = Number(firstLine);
 
         dataArray.shift(); // to get data only
 
-        const schedule = new Array(F).fill([]); //vehicles
-        let ridesOriginal = parse(dataArray);
-        let ridesSorted = sortByF(ridesOriginal);
-        let rides = ridesSorted.slice();
-        // console.log('rides', rides, '\n');
+        let photos = parsePhotos(dataArray);
+        console.log('photosLength', photosLength, 'photos', photos);
 
-        for (let i = 0; i < schedule.length; i++) {
-          if (rides.length === 0) {
-            continue;
-          }
-          const foundRides = findByLatest(rides, ridesOriginal);
-          schedule[i] = foundRides;
-          // console.log(rides.length, foundRides.length)
-          // console.log('@', {foundRides});
-          rides = rides.filter(item => foundRides.indexOf(item.i) === -1);
-          // console.log(rides.length, '\n')
+        // slide: {getPhotos():[photo1, photo2], getTags(): [tag1, tag2], hasSpace(): getPhotos().length < 2}
 
-          // console.log(
-          //   'Car Rides: Found', foundRides,
-          //   '.length', foundRides.length,
-          //   'Left', rides.length
-          // );
-        }
-
-        console.log('Rides left', rides[0]);
-        console.log('Rides left', rides.length);
-
-        // console.log('\nschedule', schedule);
+        // 1. make a V+V slides first findHighestInterestFactorPair
+        // 2. now when we have all slides, we need to find a chain with highest interest
+        // 3. we can try to do it one by one, filling one max pair after another by
+        // searching a max pair for the last element in chain
+        // 4. Find a score for the album by counting all slides interest factor summation.
 
         let results = '';
-        schedule.forEach(result => {
-          results +=
-            result.length.toString() + ' ' + result.join` `.trim() + '\n';
-        });
+        // schedule.forEach(result => {
+        //   results +=
+        //     result.length.toString() + ' ' + result.join` `.trim() + '\n';
+        // });
 
         // output example:
-        // 1 0 - this vehicle is assigned 1 ride: [0]
-        // 2 2 1 - this vehicle is assigned 2 rides: [2, 1]
+        // 3 - The slideshow has 3 slides
+        // 0 - First slide contains photo 0
+        // 1 2 - Second slide contains photos 1 and 2
         // console.log('\nResults:\n', results);
         writeResults(results, fileName);
         console.timeEnd(timeLabel);
@@ -122,135 +100,33 @@ function processFile(fileName) {
 
 // --------------------------------------
 
-const parse = data => {
-  let results = [];
-  for (let i = 0; i < data.length; i++) {
-    const rideArr = data[i].split(' ');
-    const ride = {
-      a: parseInt(rideArr[0]),
-      b: parseInt(rideArr[1]),
-      x: parseInt(rideArr[2]),
-      y: parseInt(rideArr[3]),
-      s: parseInt(rideArr[4]),
-      f: parseInt(rideArr[5]),
+function parsePhotos(data) {
+  let i, line, photo;
+  let length = data.length;
+  let result = [];
+  for (i = 0; i < length; i++) {
+    line = data[i].split(' ');
+    photo = {
+      orientation: line.shift(),
+      tagsLength: Number(line.shift()),
+      tags: line,
       i
     };
-    ride.d = Math.abs(ride.x - ride.a) + Math.abs(ride.y - ride.b);
-    results.push(ride);
+    result.push(photo);
   }
-  return results;
-};
-
-const sortByF = rides => rides.sort((a, b) => a.f - b.f);
-
-//homes.sort(fieldSorter(['city', '-price']));
-// homes.sort(fieldSorter(['zip', '-state', 'price'])); // alternative
-
-function dynamicSort(property) {
-  return function(obj1, obj2) {
-    return obj1[property] > obj2[property]
-      ? 1
-      : obj1[property] < obj2[property]
-      ? -1
-      : 0;
-  };
-}
-
-function dynamicSortMultiple() {
-  // eslint-disable-line
-  /*
-   * save the arguments object as it will be overwritten
-   * note that arguments object is an array-like object
-   * consisting of the names of the properties to sort by
-   */
-  var props = arguments;
-  return function(obj1, obj2) {
-    var i = 0,
-      result = 0,
-      numberOfProperties = props.length;
-    /* try getting a different result from 0 (equal)
-     * as long as we have extra properties to compare
-     */
-    while (result === 0 && i < numberOfProperties) {
-      result = dynamicSort(props[i])(obj1, obj2);
-      i++;
-    }
-    return result;
-  };
-}
-
-const findByLatest = (rides, ridesOriginal) => {
-  let latestRide = rides[rides.length - 1];
-  let result = [latestRide.i];
-  let skipi = [rides[rides.length - 1].i]; // skip first
-
-  let searchActive = true;
-
-  while (searchActive) {
-    let nextRide = null;
-
-    // console.log('\nlatestRide', latestRide);
-
-    // TODO: optimize here
-    // const ridesSorted = rides.splice().sort((a,b)=> b.d - a.d );
-    // const ridesSorted = rides.splice().sort(dynamicSortMultiple('a', 'b', 'x', 'y'));
-
-    // const ridesSorted = rides.splice().sort((a,b) => {
-    //   if (a.x < b.x && a.y < b.y)
-    //     return -1;
-    //   if (a.x > b.x && a.y > b.y)
-    //     return 1;
-    //   if (a.a < b.a && a.b < b.b)
-    //     return -1;
-    //   if (a.a > b.a && a.b > b.b)
-    //     return 1;
-    //   return 0;
-    // });
-
-    rides.forEach(item => {
-      // ridesSorted.forEach(item => {
-      // const prevRideTime = latestRide.f - latestRide.d;
-      // const nextRideTime = item.f - item.d;
-      const prevRideTime = latestRide.s - latestRide.d;
-      const nextRideTime = item.s - item.d;
-      if (prevRideTime - nextRideTime > 0) {
-        // console.log('found a ride');
-        nextRide = item;
-      }
-    });
-
-    if (!nextRide) {
-      searchActive = false;
-      continue;
-    }
-
-    // console.log({result, rides});
-    const distance = result.reduce(
-      (acc, item) => acc + ridesOriginal[item].d,
-      0
-    );
-    // console.log({result, distance});
-
-    const exitNoTime = time - distance - nextRide.d < 0;
-    if (exitNoTime) {
-      // console.log('Car filled with rides');
-      searchActive = false;
-      continue;
-    }
-
-    if (nextRide) {
-      const exitWasUsed = skipi.indexOf(nextRide.i) !== -1;
-      if (exitWasUsed) {
-        // console.log('exitWasUsed');
-        searchActive = false;
-        continue;
-      }
-      // console.log('==> Car Push a ride i', nextRide.i);
-      skipi.push(nextRide.i);
-      result.unshift(nextRide.i);
-      latestRide = nextRide;
-    }
-  }
-
   return result;
-};
+}
+
+/**
+ * For two subsequent slides Si and Si+1,
+ * the interest factor is the minimum (the smallest number of the three) of:
+ * ● the number of common tags between Si and Si+1
+ * ● the number of tags in Si but not in Si+1
+ * ● the number of tags in Si+1 but not in Si.
+ *
+ * @param {*} data
+ * @returns {Array} pair
+ */
+function findHighestInterestFactorPair(data) {
+  return { pair: [{}, {}], interestFactor: Math.min(0)};
+}
