@@ -67,16 +67,23 @@ function processFile(fileName) {
         dataArray.shift(); // to get data only
 
         let photos = parsePhotos(dataArray);
-        let photosMap = {};
-        photos.forEach(photo => (photosMap[photo.id] = photo));
+        // let photosMap = {};
+        // photos.forEach(photo => (photosMap[photo.id] = photo));
         console.log('photosLength', photosLength, 'photos', photos);
 
         let hPhotos = photos.filter(photo => photo.orientation === 'H');
         let vPhotos = photos.filter(photo => photo.orientation === 'V');
-        let slides = [...hPhotos.map(photo => new Slide(photo.id))];
+        let slides = [...hPhotos.map(photo => new Slide(photo))]; // not ordered
         // 1. make a V+V slides first, using findHighestInterestFactorPair
-        let slidesWithVerticalPhotos = getSlidesWithVerticalPhotos(vPhotos);
-        slides.push(slidesWithVerticalPhotos);
+        // let slidesWithVerticalPhotos = getSlidesWithVerticalPhotos(vPhotos);
+        // slides.push(slidesWithVerticalPhotos);
+
+        // TODO: TEST
+        console.log('TEST');
+        console.log(
+          buildInterestScoresMap([...photos.map(photo => new Slide(photo))])
+        );
+        // TODO: TEST-END
 
         // 2. now when we have all slides, we need to find a chain with highest interest,
         // aka sort, we can try to do it one by one
@@ -84,6 +91,7 @@ function processFile(fileName) {
         // if left part is bigger than right - then pick left
         // and then add left parts for the left, and right parts to the right
         let sortedSlides = [];
+        // build a sorted slides using findHighestInterestFactorPair
 
         // 3. Find a score for the album by counting all slides interest factor summation.
 
@@ -110,14 +118,17 @@ function processFile(fileName) {
 // --------------------------------------
 
 class Slide {
-  constructor(photoId1, photoId2 = null) {
-    this.photos = [photoId1];
-    if (photoId2 !== null) {
-      this.photos.push(photoId2);
+  constructor(photo, photo2 = null) {
+    this.photos = [photo];
+    if (photo2 !== null) {
+      this.photos.push(photo2);
     }
   }
-  getPhotoIds() {
+  getPhotos() {
     return this.photos;
+  }
+  getPhotosIds() {
+    return this.getPhotos().map(photo => photo.id);
   }
   getTags() {
     return Array.from(
@@ -152,6 +163,10 @@ function getSlidesWithVerticalPhotos(vPhotos) {
   let singlePhotoSlides = vPhotos.map(photo => new Slide(photo.id));
   // in for loop build a slides one by one using findHighestInterestFactorPair(restOfSinglePhotoSlides);
 
+  // let slide0 = findHighestInterestFactorPair([
+  //   ...photos.map(photo => new Slide(photo))
+  // ]);
+
   return [new Slide()];
 }
 
@@ -173,15 +188,93 @@ function findHighestInterestFactorPair(slides) {
     differenceA,
     differenceB,
     intersection,
-    interestFactor;
+    interestFactor,
+    scoresMap = {},
+    scoresMapKey,
+    i,
+    j,
+    length = slides.length;
 
-  // differenceA = aTags.filter(x => !bTags.includes(x));
-  // differenceB = bTags.filter(x => !aTags.includes(x));
-  // intersection = aTags.filter(x => bTags.includes(x));
-  // interestFactor = Math.min(differenceA, differenceB, intersection);
+  for (i = 0; i < length; i++) {
+    aSlide = slides[i];
+    aTags = aSlide.getTags();
+    for (j = i + 1; j < length; j++) {
+      bSlide = slides[j];
+      bTags = bSlide.getTags();
+      differenceA = aTags.filter(x => !bTags.includes(x));
+      differenceB = bTags.filter(x => !aTags.includes(x));
+      intersection = aTags.filter(x => bTags.includes(x));
+      interestFactor = Math.min(
+        differenceA.length,
+        differenceB.length,
+        intersection.length
+      );
+      scoresMapKey = `${i},${j}`;
+      if (scoresMap[scoresMapKey] === undefined) {
+        scoresMap[`${i},${j}`] = {
+          ids: [aSlide.getPhotosIds(), bSlide.getPhotosIds],
+          interestFactor
+        };
+      }
+    }
+  }
+
+  let smKeys = Object.keys(scoresMap);
+  let smKeyMax;
+  smKeys.sort(
+    (a, b) => scoresMap[b].interestFactor - scoresMap[a].interestFactor
+  );
+  smKeyMax = smKeys[0];
+  [aSlide, bSlide] = smKeyMax.split(',');
+  aSlide = slides[aSlide];
+  bSlide = slides[bSlide];
 
   return {
     pair: [aSlide, bSlide],
-    interestFactor
+    interestFactor: scoresMap[smKeyMax],
+    scoresMap
   };
+}
+
+/**
+ *
+ * @param {Array} slides
+ * @returns {Object} interest scores map
+ */
+function buildInterestScoresMap(slides) {
+  let aSlide,
+    bSlide,
+    aTags,
+    bTags,
+    differenceA,
+    differenceB,
+    intersection,
+    interestFactor,
+    scoresMap = [],
+    i,
+    j,
+    length = slides.length;
+
+  for (i = 0; i < length; i++) {
+    aSlide = slides[i];
+    aTags = aSlide.getTags();
+    for (j = i + 1; j < length; j++) {
+      bSlide = slides[j];
+      bTags = bSlide.getTags();
+      differenceA = aTags.filter(x => !bTags.includes(x));
+      differenceB = bTags.filter(x => !aTags.includes(x));
+      intersection = aTags.filter(x => bTags.includes(x));
+      interestFactor = Math.min(
+        differenceA.length,
+        differenceB.length,
+        intersection.length
+      );
+      scoresMap.push({
+        ids: [...aSlide.getPhotosIds(), ...bSlide.getPhotosIds()],
+        interestFactor
+      });
+    }
+  }
+
+  return scoresMap;
 }
