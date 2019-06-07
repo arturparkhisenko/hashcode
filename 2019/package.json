@@ -20,7 +20,7 @@
     "debug": "node --inspect index.js"
   },
   "devDependencies": {
-    "eslint": "^5.15.3"
+    "eslint": "^5.16.0"
   },
   "dependencies": {
     "archiver": "^3.0.0"
